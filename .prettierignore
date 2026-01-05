@@ -1,0 +1,30 @@
+# Node dependencies
+node_modules
+
+# Editor / OS files
+.idea
+.vscode
+.DS_Store
+
+# Platform tooling
+.vercel
+.turbo
+
+# Environment & secrets
+.env
+.env.*
+
+# Logs & runtime artifacts
+*.txt
+*.log
+*.tsbuildinfo
+
+# Build / Test files 
+**/dist
+**/test
+
+# Workspace / Package lock files
+pnpm-workspace.yaml
+pnpm-lock.yaml
+package-lock.json
+bun.lock
