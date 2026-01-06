@@ -16,7 +16,6 @@ node_modules
 !.env.example
 
 # Logs & runtime artifacts
-*.txt
 *.log
 *.tsbuildinfo
 

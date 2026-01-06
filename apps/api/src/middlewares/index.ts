@@ -6,8 +6,8 @@ import { Types } from "mongoose";
 import multer from "multer";
 import { ZodError, type ZodType } from "zod";
 
-import { User } from "#/models/index.js";
 import env from "#/configs/env.js";
+import { User } from "#/models/index.js";
 import { generateSecret, generateAccess, generateRefresh, createUserInfo, generateHash } from "#/utils/helpers.js";
 import { HttpError, ErrorResponse, SuccessResponse } from "#/utils/response.js";
 

@@ -1,9 +1,9 @@
 import { genSalt, hash, compare } from "bcryptjs";
 import { Types } from "mongoose";
 
+import env from "#/configs/env.js";
 import { revokeToken } from "#/middlewares/index.js";
 import { User } from "#/models/index.js";
-import env from "#/configs/env.js";
 import { generateAccess, generateRefresh, createUserInfo, generateHash } from "#/utils/helpers.js";
 import { HttpError, ErrorResponse, SuccessResponse } from "#/utils/response.js";
 

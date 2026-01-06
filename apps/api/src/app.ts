@@ -10,8 +10,8 @@ import morgan from "morgan";
 import requestIp from "request-ip";
 
 import env from "#/configs/env.js";
-import routers from "#/routers/index.js";
 import { limiter } from "#/middlewares/index.js";
+import routers from "#/routers/index.js";
 import { HttpError, ErrorResponse, SuccessResponse } from "#/utils/response.js";
 
 import type { NextFunction, Request, Response, ErrorRequestHandler } from "express";

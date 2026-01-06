@@ -1,8 +1,8 @@
 import { genSalt, hash, compare } from "bcryptjs";
 
+import { deleteImageByUrl, uploadOnCloudinary } from "#/configs/cloudinary.js";
 import { User } from "#/models/index.js";
 import { getSocketId, io } from "#/server.js";
-import { deleteImageByUrl, uploadOnCloudinary } from "#/configs/cloudinary.js";
 import { hasEmptyField, createUserInfo, generateAccess } from "#/utils/helpers.js";
 import { HttpError, ErrorResponse, SuccessResponse } from "#/utils/response.js";
 import { unlinkFilesWithExtensions, extensionsToDelete, folderPath } from "#/utils/unlink.js";
