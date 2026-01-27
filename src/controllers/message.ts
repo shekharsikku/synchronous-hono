@@ -299,7 +299,6 @@ export const reactMessage = async (ctx: Context) => {
 
     return SuccessResponse(ctx, 200, "Message reacted successfully!");
   } catch (error: any) {
-    console.log({ error });
     return ErrorResponse(ctx, error.code || 500, error.message || "Error while reacting message!");
   }
 };

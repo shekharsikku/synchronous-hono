@@ -24,7 +24,7 @@ io.use((socket, next) => {
   const secretKey = socket.handshake.auth.secretKey as string;
 
   if (secretKey !== env.SOCKET_SECRET) {
-    console.log("Unauthorized socket attempt:", socket.handshake);
+    console.error("Unauthorized socket attempt:", socket.handshake);
     return next(new Error("Unauthorized socket connection!"));
   }
 
@@ -41,7 +41,7 @@ io.on("connection", (socket) => {
     userSocketMap.get(userId)?.add(socket.id);
     console.log(`User connected: ${userId}:${socket.id}`);
   } else {
-    console.log(`Socket disconnected missing userId:${socket.id}`);
+    console.error(`Socket disconnected missing userId:${socket.id}`);
     socket.disconnect();
   }
 
