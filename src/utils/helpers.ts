@@ -22,7 +22,7 @@ export const generateAccess = async (ctx: Context, user?: UserInterface) => {
     .setProtectedHeader({ alg: "dir", enc: "A256GCM" })
     .encrypt(accessSecret);
 
-  setSignedCookie(ctx, "access", accessToken, env.SIGNED_SECRET, {
+  await setSignedCookie(ctx, "access", accessToken, env.SIGNED_SECRET, {
     maxAge: accessExpiry,
     httpOnly: true,
     sameSite: "strict",
@@ -44,14 +44,14 @@ export const generateRefresh = async (ctx: Context, uid: Types.ObjectId, aid: Ty
     .setJti(jti)
     .sign(refreshSecret);
 
-  setSignedCookie(ctx, "refresh", refreshToken, env.SIGNED_SECRET, {
+  await setSignedCookie(ctx, "refresh", refreshToken, env.SIGNED_SECRET, {
     maxAge: refreshExpiry * 2,
     httpOnly: true,
     sameSite: "Strict",
     secure: env.isProd,
   });
 
-  setSignedCookie(ctx, "current", currentAuthKey, env.SIGNED_SECRET, {
+  await setSignedCookie(ctx, "current", currentAuthKey, env.SIGNED_SECRET, {
     maxAge: refreshExpiry * 2,
     httpOnly: true,
     sameSite: "strict",
