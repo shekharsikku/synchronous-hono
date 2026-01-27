@@ -20,6 +20,6 @@ const message = new Hono()
   .patch("/react/:id", limiter(1, 100), authAccess, reactMessage)
   .delete("/delete/:id", limiter(1, 20), authAccess, deleteMessage)
   .delete("/delete", limiter(10, 5), authAccess, deleteMessages)
-  .post("/translate", validate(TranslateSchema), translateMessage);
+  .post("/translate", limiter(1, 20), validate(TranslateSchema), translateMessage);
 
 export default message;
