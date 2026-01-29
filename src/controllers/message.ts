@@ -1,10 +1,11 @@
+import { translate } from "bing-translate-api";
 import type { Context } from "hono";
 import { Types } from "mongoose";
 import type { MessageInterface } from "#/interfaces/index.js";
 import { Conversation, Message } from "#/models/index.js";
 import { getSocketId, io } from "#/server.js";
 import { ErrorResponse, HttpError, SuccessResponse } from "#/utils/response.js";
-import type { Message as MessageType } from "#/utils/schema.js";
+import type { Message as MessageType, Translate } from "#/utils/schema.js";
 import { fetchMembers } from "./group.js";
 
 export const sendMessage = async (ctx: Context) => {
@@ -324,24 +325,19 @@ export const deleteMessages = async (ctx: Context) => {
 
 export const translateMessage = async (ctx: Context) => {
   try {
-    const { message, language } = await ctx.req.json();
+    const { message, language } = ctx.get("validated") as Translate;
 
     if (!message || !language) {
       throw new HttpError(400, "Text message and language is required!");
     }
 
-    // const result = await translate(message, null, language);
+    const result = await translate(message, null, language);
 
-    // if (!result) {
-    //   throw new HttpError(500, "Error while translating message!");
-    // }
+    if (!result) {
+      throw new HttpError(500, "Error while translating message!");
+    }
 
-    return SuccessResponse(
-      ctx,
-      200,
-      "Text translated successfully!",
-      // result.translation,
-    );
+    return SuccessResponse(ctx, 200, "Text translated successfully!", result.translation);
   } catch (error: any) {
     return ErrorResponse(ctx, error.code || 500, error.message || "Error while translating message!");
   }

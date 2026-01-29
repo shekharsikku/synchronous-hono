@@ -1,6 +1,6 @@
 import { hash, verify } from "argon2";
 import type { Context } from "hono";
-import { getSignedCookie } from "hono/cookie";
+import { deleteCookie, getSignedCookie } from "hono/cookie";
 import { Types } from "mongoose";
 import env from "#/configs/env.js";
 import { revokeToken } from "#/middlewares/index.js";
@@ -31,7 +31,7 @@ export const signUpUser = async (ctx: Context) => {
 
 export const signInUser = async (ctx: Context) => {
   try {
-    const deviceId = ctx.req.header("x-device-id") ?? env.SIGNED_SECRET;
+    const deviceId = ctx.req.header("x-device-id") ?? "unknown-device";
     const { email, username, password } = ctx.get("validated") as SignIn;
     const conditions = [];
 
@@ -89,6 +89,10 @@ export const signOutUser = async (ctx: Context) => {
   if (currentAuthKey) {
     await revokeToken(ctx, currentAuthKey);
   }
+
+  deleteCookie(ctx, "access");
+  deleteCookie(ctx, "refresh");
+  deleteCookie(ctx, "current");
 
   return SuccessResponse(ctx, 200, "Signed out successfully!");
 };

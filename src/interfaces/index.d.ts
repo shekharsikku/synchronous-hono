@@ -1,7 +1,6 @@
 import type { Document, Types } from "mongoose";
 
 export interface UserInterface extends Document {
-  _id?: Types.ObjectId;
   name?: string;
   email: string;
   username?: string;
@@ -18,14 +17,12 @@ export interface UserInterface extends Document {
 }
 
 export interface ConversationInterface extends Document {
-  _id?: Types.ObjectId;
   participants: Types.ObjectId[];
-  models?: "User" | "Group";
+  models: "User" | "Group";
   interaction: Date;
 }
 
 export interface MessageInterface extends Document {
-  _id?: Types.ObjectId;
   sender: Types.ObjectId;
   recipient?: Types.ObjectId;
   group?: Types.ObjectId;
@@ -39,15 +36,14 @@ export interface MessageInterface extends Document {
       emoji: string;
     }[];
   };
-  reply: Types.ObjectId;
-  deletedAt: Date;
+  reply?: Types.ObjectId;
+  deletedAt?: Date;
 }
 
 export interface GroupInterface extends Document {
-  _id?: Types.ObjectId;
   name: string;
   description: string;
-  avatar?: string | null;
+  avatar?: string;
   admin: Types.ObjectId;
   members: Types.ObjectId[];
 }

@@ -21,13 +21,13 @@ type TypeResponse<T = any, E = any> = {
 };
 
 export const ErrorResponse = <E = any>(ctx: Context, code: ContentfulStatusCode, message: string, error?: E) => {
-  const response: TypeResponse<null, E> = { success: false, message };
+  const response: TypeResponse<undefined, E> = { success: false, message };
   if (error !== undefined) response.error = error;
-  return ctx.json<TypeResponse<null, E>>(response, code);
+  return ctx.json<TypeResponse<undefined, E>>(response, code);
 };
 
 export const SuccessResponse = <T = any>(ctx: Context, code: ContentfulStatusCode, message: string, data?: T) => {
-  const response: TypeResponse<T, null> = { success: true, message };
+  const response: TypeResponse<T, undefined> = { success: true, message };
   if (data !== undefined) response.data = data;
-  return ctx.json<TypeResponse<T, null>>(response, code);
+  return ctx.json<TypeResponse<T, undefined>>(response, code);
 };
