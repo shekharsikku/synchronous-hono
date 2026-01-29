@@ -4,6 +4,7 @@ import { imagekitDelete, imagekitUpload } from "#/configs/imagekit.js";
 import type { UserInterface } from "#/interfaces/index.js";
 import { User } from "#/models/index.js";
 import { getSocketId, io } from "#/server.js";
+import { eventsService } from "#/services/events.js";
 import { argonOptions, createUserInfo, generateAccess, hasEmptyField } from "#/utils/helpers.js";
 import { ErrorResponse, HttpError, SuccessResponse } from "#/utils/response.js";
 
@@ -15,7 +16,7 @@ const profileUpdateEvents = async (userData: UserInterface) => {
 export const profileSetup = async (ctx: Context) => {
   try {
     const { name, username, gender, bio } = ctx.get("validated");
-    const requestUser = ctx.req.user;
+    const requestUser = ctx.req.user!;
 
     if (username !== requestUser?.username) {
       const existsUsername = await User.exists({ username });
@@ -25,6 +26,7 @@ export const profileSetup = async (ctx: Context) => {
       }
     }
 
+    const wasSetup = requestUser?.setup;
     const userDetails = { name, username, gender, bio, setup: false };
     const isCompleted = !hasEmptyField({ name, username, gender });
 
@@ -39,6 +41,10 @@ export const profileSetup = async (ctx: Context) => {
     }
 
     const userInfo = createUserInfo(updatedProfile);
+
+    if (!wasSetup && userInfo.setup) {
+      eventsService.send(requestUser._id.toString(), "profile-setup-complete", userInfo);
+    }
 
     if (!userInfo.setup) {
       return SuccessResponse(ctx, 200, "Please, complete your profile!", userInfo);

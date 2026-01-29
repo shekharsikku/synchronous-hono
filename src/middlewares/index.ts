@@ -49,7 +49,7 @@ export const revokeToken = async (ctx: Context, authKey: any) => {
   }
 };
 
-export const authAccess = async (ctx: Context, next: Next): Promise<any> => {
+export const authAccess = async (ctx: Context, next: Next) => {
   try {
     const accessToken = await getSignedCookie(ctx, env.SIGNED_SECRET, "access");
 
@@ -68,15 +68,15 @@ export const authAccess = async (ctx: Context, next: Next): Promise<any> => {
     }
 
     ctx.req.user = accessPayload;
-    await next();
+    return await next();
   } catch (error: any) {
     return ErrorResponse(ctx, error.code || 500, error.message || "Error while auth access!");
   }
 };
 
-export const authRefresh = async (ctx: Context): Promise<any> => {
+export const authRefresh = async (ctx: Context) => {
   try {
-    const deviceId = ctx.req.header("x-device-id") ?? env.SIGNED_SECRET;
+    const deviceId = ctx.req.header("x-device-id") ?? "unknown-device";
     const refreshToken = await getSignedCookie(ctx, env.SIGNED_SECRET, "refresh");
     const currentAuthKey = await getSignedCookie(ctx, env.SIGNED_SECRET, "current");
 
@@ -159,6 +159,25 @@ export const authRefresh = async (ctx: Context): Promise<any> => {
     return SuccessResponse(ctx, 200, "Token refreshed successfully!");
   } catch (error: any) {
     return ErrorResponse(ctx, error.code || 500, error.message || "Error while token refresh!");
+  }
+};
+
+export const authEvents = async (ctx: Context, next: Next) => {
+  try {
+    const accessToken = await getSignedCookie(ctx, env.SIGNED_SECRET, "access");
+
+    if (!accessToken) {
+      return ctx.text("Unauthorized events request!", 401);
+    }
+
+    const accessSecret = await generateSecret();
+    const decrypted = await compactDecrypt(accessToken, accessSecret);
+    const accessPayload = JSON.parse(inflateSync(decrypted.plaintext).toString());
+
+    ctx.req.user = accessPayload;
+    return await next();
+  } catch (_error: any) {
+    return ctx.text("Unauthorized events request!", 401);
   }
 };
 

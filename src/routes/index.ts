@@ -1,5 +1,6 @@
 import { Hono } from "hono";
-import { limiter } from "#/middlewares/index.js";
+import { authEvents, limiter } from "#/middlewares/index.js";
+import { connectEvents } from "#/services/events.js";
 import authRoutes from "./auth.js";
 import contactRoute from "./contact.js";
 import groupRoutes from "./group.js";
@@ -12,6 +13,7 @@ const routes = new Hono()
   .route("/user", userRoutes)
   .route("/contact", contactRoute)
   .route("/group", groupRoutes)
-  .route("/message", messageRoutes);
+  .route("/message", messageRoutes)
+  .get("/events", authEvents, connectEvents);
 
 export default routes;
