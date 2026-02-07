@@ -1,9 +1,9 @@
 import type { Context } from "hono";
 import { Types } from "mongoose";
-import { Conversation, Group, Message, User } from "#/models/index.js";
+import { Conversation, Group, User } from "#/models/index.js";
 import { getSocketId, io } from "#/server.js";
 import { ErrorResponse, HttpError, SuccessResponse } from "#/utils/response.js";
-import type { CreateGroup, Message as MessageType, UpdateDetails, UpdateMembers } from "#/utils/schema.js";
+import type { CreateGroup, UpdateDetails, UpdateMembers } from "#/utils/schema.js";
 
 export const createGroup = async (ctx: Context) => {
   try {
@@ -63,7 +63,7 @@ export const updateDetails = async (ctx: Context) => {
   try {
     const groupId = ctx.req.param("id");
     const updateData = ctx.get("validated") as UpdateDetails;
-    const reqUser = ctx.req.user?._id;
+    const reqUser = ctx.req.user?._id!;
 
     if (updateData.name) {
       const existingGroup = await Group.exists({
@@ -97,7 +97,7 @@ export const updateMembers = async (ctx: Context) => {
   try {
     const groupId = ctx.req.param("id");
     const { add, remove } = ctx.get("validated") as UpdateMembers;
-    const reqUser = ctx.req.user?._id;
+    const reqUser = ctx.req.user?._id!;
 
     if (!add?.length && !remove?.length) {
       throw new HttpError(400, "Provide at least one member to add or remove!");
@@ -181,68 +181,4 @@ export const fetchGroups = async (ctx: Context) => {
 export const fetchMembers = async (gid: Types.ObjectId) => {
   const group = await Group.findById(gid).select("-_id members").lean();
   return group?.members.map((id) => id.toString()) || [];
-};
-
-export const groupMessage = async (ctx: Context) => {
-  try {
-    const sender = ctx.req.user?._id!;
-    const group = new Types.ObjectId(ctx.req.param("id"));
-    const { type, text, file, reply } = ctx.get("validated") as MessageType;
-
-    const interaction = new Date(Date.now());
-
-    let [message, conversation] = await Promise.all([
-      Message.create({
-        sender: sender,
-        group: group,
-        content: {
-          type: type,
-          text: text,
-          file: file,
-        },
-        reply: reply && new Types.ObjectId(reply),
-      }),
-      Conversation.findOneAndUpdate(
-        { participants: { $all: [group] } },
-        {
-          interaction: interaction,
-        },
-        { new: true },
-      ).populate("participants"),
-    ]);
-
-    let members: string[] = [];
-
-    /* If no conversation, create one and fetch members manually */
-    if (!conversation) {
-      [conversation, members] = await Promise.all([
-        Conversation.create({
-          participants: [group],
-          models: "Group",
-          interaction: interaction,
-        }),
-        fetchMembers(group),
-      ]);
-    } else if (!members && conversation.models === "Group") {
-      members = (conversation.participants?.[0] as any).members || [];
-    } else {
-      members = await fetchMembers(group);
-    }
-
-    const socketIds = members.flatMap((member) => getSocketId(member)).filter(Boolean);
-
-    /** for update new message */
-    io.to(socketIds).emit("message:receive", message);
-
-    /** for update last chat contact */
-    io.to(socketIds).emit("conversation:updated", {
-      _id: group,
-      type: "group",
-      interaction,
-    });
-
-    return SuccessResponse(ctx, 201, "Message sent successfully!");
-  } catch (error: any) {
-    return ErrorResponse(ctx, error.code || 500, error.message || "Error while changing group avatar!");
-  }
 };

@@ -10,65 +10,102 @@ import { fetchMembers } from "./group.js";
 
 export const sendMessage = async (ctx: Context) => {
   try {
-    const sender = ctx.req.user?._id!;
-    const receiver = new Types.ObjectId(ctx.req.param("id"));
+    const senderId = ctx.req.user?._id!;
+    const receiverId = new Types.ObjectId(ctx.req.param("id"));
+    const isGroup = ctx.req.query("group") === "group";
     const { type, text, file, reply } = ctx.get("validated") as MessageType;
 
-    const message = await Message.create({
-      sender: sender,
-      recipient: receiver,
-      content: {
-        type: type,
-        text: text,
-        file: file,
-      },
-      reply: reply && new Types.ObjectId(reply),
-    });
+    const content: {
+      type: "text" | "file";
+      text?: string;
+      file?: string;
+    } = { type };
+
+    if (type === "text" && text) content.text = text;
+    if (type === "file" && file) content.file = file;
 
     const interaction = new Date(Date.now());
-    const socketEventInfo = [
-      {
-        userId: message.sender.toString(),
-        targetId: message.recipient?.toString()!,
-      },
-      {
-        userId: message.recipient?.toString()!,
-        targetId: message.sender.toString(),
-      },
-    ];
 
-    for (const { userId, targetId } of socketEventInfo) {
-      const userSocketIds = getSocketId(userId);
+    let [message, conversation] = await Promise.all([
+      Message.create({
+        sender: senderId,
+        ...(isGroup ? { group: receiverId } : { recipient: receiverId }),
+        content: content,
+        ...(reply && { reply: new Types.ObjectId(reply) }),
+      }),
+      Conversation.findOneAndUpdate(
+        {
+          participants: isGroup ? { $size: 1, $all: [receiverId] } : { $all: [senderId, receiverId] },
+          models: isGroup ? "Group" : "User",
+        },
+        {
+          interaction: interaction,
+        },
+        { new: true },
+      ),
+    ]);
 
-      if (userSocketIds.length > 0) {
-        /** for update new message */
-        io.to(userSocketIds).emit("message:receive", message);
-
-        /** for update last chat contact */
-        io.to(userSocketIds).emit("conversation:updated", {
-          _id: targetId,
-          type: "contact",
-          interaction,
-        });
-      }
-    }
-
-    let conversation = await Conversation.findOneAndUpdate(
-      { participants: { $all: [sender, receiver] } },
-      {
-        interaction: interaction,
-      },
-      { new: true },
-    );
+    let members: string[] = [];
 
     if (!conversation) {
       conversation = await Conversation.create({
-        participants: [sender, receiver],
-        models: "User",
+        participants: isGroup ? [receiverId] : [senderId, receiverId],
+        models: isGroup ? "Group" : "User",
         interaction: interaction,
       });
+
+      if (isGroup) {
+        members = await fetchMembers(receiverId);
+      }
     }
 
+    if (!members.length && conversation) {
+      const populated = await conversation.populate("participants");
+      members = (populated.participants?.[0] as any)?.members ?? [];
+
+      if (!members.length) {
+        members = await fetchMembers(receiverId);
+      }
+
+      const socketIds = members.flatMap((member) => getSocketId(member)).filter(Boolean);
+
+      /** for update new message */
+      io.to(socketIds).emit("message:receive", message);
+
+      /** for update last chat contact */
+      io.to(socketIds).emit("conversation:updated", {
+        _id: receiverId,
+        type: "group",
+        interaction,
+      });
+    } else {
+      const socketEventInfo = [
+        {
+          userId: message.sender.toString(),
+          targetId: message.recipient?.toString()!,
+        },
+        {
+          userId: message.recipient?.toString()!,
+          targetId: message.sender.toString(),
+        },
+      ];
+
+      for (const { userId, targetId } of socketEventInfo) {
+        const userSocketIds = getSocketId(userId);
+
+        if (userSocketIds.length > 0) {
+          /** for update new message */
+          io.to(userSocketIds).emit("message:receive", message);
+
+          /** for update last chat contact */
+          io.to(userSocketIds).emit("conversation:updated", {
+            _id: targetId,
+            type: "contact",
+            interaction,
+          });
+        }
+      }
+    }
     return SuccessResponse(ctx, 201, "Message sent successfully!");
   } catch (error: any) {
     return ErrorResponse(ctx, error.code || 500, error.message || "Error while sending message!");
@@ -156,7 +193,7 @@ const messageActionsEvents = async (message: MessageInterface, event: string) =>
 
 export const editMessage = async (ctx: Context) => {
   try {
-    const userId = ctx.req.user?._id;
+    const userId = ctx.req.user?._id!;
     const msgId = ctx.req.param("id");
     const { text } = await ctx.req.json();
 
@@ -187,7 +224,7 @@ export const editMessage = async (ctx: Context) => {
 
 export const deleteMessage = async (ctx: Context) => {
   try {
-    const userId = ctx.req.user?._id;
+    const userId = ctx.req.user?._id!;
     const msgId = ctx.req.param("id");
 
     const message = await Message.findOneAndUpdate(
@@ -214,8 +251,9 @@ export const deleteMessage = async (ctx: Context) => {
 
 export const reactMessage = async (ctx: Context) => {
   try {
+    const by = ctx.req.user?._id!;
     const msgId = ctx.req.param("id");
-    const { by, emoji } = await ctx.req.json();
+    const { emoji } = await ctx.req.json();
 
     if (!by || !emoji) {
       throw new HttpError(400, "Emoji is required for reacting!");
@@ -306,7 +344,7 @@ export const reactMessage = async (ctx: Context) => {
 
 export const deleteMessages = async (ctx: Context) => {
   try {
-    const userId = ctx.req.user?._id;
+    const userId = ctx.req.user?._id!;
     const before = Number(ctx.req.query("before") ?? 1) * 24;
 
     const hoursAgo = new Date();
