@@ -12,7 +12,7 @@ const env = cleanEnv(process.env, {
   REFRESH_EXPIRY: num(),
 
   SIGNED_SECRET: str(),
-  SOCKET_SECRET: str(),
+  SOCKET_PUBLIC: str(),
   MONGODB_URI: url(),
 
   STRICT_MODE: bool({ default: false }),

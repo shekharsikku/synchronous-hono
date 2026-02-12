@@ -12,7 +12,7 @@ export const sendMessage = async (ctx: Context) => {
   try {
     const senderId = ctx.req.user?._id!;
     const receiverId = new Types.ObjectId(ctx.req.param("id"));
-    const isGroup = ctx.req.query("group") === "group";
+    const isGroup = ctx.req.query("type") === "group";
     const { type, text, file, reply } = ctx.get("validated") as MessageType;
 
     const content: {
