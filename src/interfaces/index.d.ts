@@ -8,7 +8,7 @@ export interface UserInterface extends Document {
   gender?: "Male" | "Female" | "Other";
   image?: string;
   bio?: string;
-  setup?: boolean;
+  setup: boolean;
   authentication?: {
     _id?: Types.ObjectId;
     token: string;

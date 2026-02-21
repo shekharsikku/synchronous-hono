@@ -1,12 +1,12 @@
 {
   "$schema": "https://biomejs.dev/schemas/2.2.5/schema.json",
   "vcs": {
-    "enabled": false,
+    "enabled": true,
     "clientKind": "git",
     "useIgnoreFile": true
   },
   "files": {
-    "ignoreUnknown": false,
+    "ignoreUnknown": true,
     "includes": ["src/**/*.ts"]
   },
   "formatter": {
@@ -22,34 +22,12 @@
     "enabled": true,
     "rules": {
       "recommended": true,
-      "complexity": {
-        "noExtraBooleanCast": "warn",
-        "noUselessCatch": "warn"
-      },
       "style": {
-        "noUnusedTemplateLiteral": "warn",
         "noNonNullAssertion": "off"
       },
-      "performance": {
-        "noDelete": "off"
-      },
       "suspicious": {
-        "noExplicitAny": "off",
-        "noImplicitAnyLet": "off",
-        "noExtraNonNullAssertion": "off"
+        "noExplicitAny": "off"
       }
-    }
-  },
-  "javascript": {
-    "formatter": {
-      "quoteProperties": "asNeeded",
-      "semicolons": "always",
-      "arrowParentheses": "always",
-      "bracketSpacing": true,
-      "bracketSameLine": false,
-      "quoteStyle": "double",
-      "attributePosition": "auto",
-      "indentWidth": 2
     }
   },
   "assist": {

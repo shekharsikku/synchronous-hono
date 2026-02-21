@@ -21,7 +21,7 @@ export const signUpUser = async (ctx: Context) => {
 
     const hashedPassword = await hash(password, argonOptions);
 
-    User.create({ email, password: hashedPassword });
+    await User.create({ email, password: hashedPassword });
 
     return SuccessResponse(ctx, 201, "Signed up successfully!");
   } catch (error: any) {

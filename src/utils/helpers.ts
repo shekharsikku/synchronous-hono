@@ -70,7 +70,7 @@ export const hasEmptyField = (fields: object) => {
 };
 
 export const createUserInfo = (user: UserInterface) => {
-  let userInfo;
+  let userInfo: Partial<UserInterface>;
 
   if (user.setup) {
     userInfo = {

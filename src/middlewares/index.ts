@@ -6,6 +6,7 @@ import { compactDecrypt, jwtVerify } from "jose";
 import { Types } from "mongoose";
 import { ZodError, type ZodObject } from "zod";
 import env from "#/configs/env.js";
+import type { UserInterface } from "#/interfaces/index.js";
 import { User } from "#/models/index.js";
 import { createUserInfo, generateAccess, generateHash, generateRefresh, generateSecret } from "#/utils/helpers.js";
 import { ErrorResponse, HttpError, SuccessResponse } from "#/utils/response.js";
@@ -57,7 +58,7 @@ export const authAccess = async (ctx: Context, next: Next) => {
       throw new HttpError(401, "Unauthorized access request!");
     }
 
-    let accessPayload;
+    let accessPayload: UserInterface;
 
     try {
       const accessSecret = await generateSecret();
