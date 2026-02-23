@@ -24,7 +24,7 @@ export const sendMessage = async (ctx: Context) => {
     if (type === "text" && text) content.text = text;
     if (type === "file" && file) content.file = file;
 
-    const interaction = new Date(Date.now());
+    const interaction = new Date();
 
     let [message, conversation] = await Promise.all([
       Message.create({
@@ -38,10 +38,8 @@ export const sendMessage = async (ctx: Context) => {
           participants: isGroup ? { $size: 1, $all: [receiverId] } : { $all: [senderId, receiverId] },
           models: isGroup ? "Group" : "User",
         },
-        {
-          interaction: interaction,
-        },
-        { new: true },
+        { interaction: interaction },
+        { returnDocument: "after" },
       ),
     ]);
 
@@ -59,9 +57,11 @@ export const sendMessage = async (ctx: Context) => {
       }
     }
 
-    if (!members.length && conversation) {
-      const populated = await conversation.populate("participants");
-      members = (populated.participants?.[0] as any)?.members ?? [];
+    if (isGroup) {
+      if (!members.length && conversation) {
+        const populated = await conversation.populate("participants");
+        members = (populated.participants?.[0] as any)?.members ?? [];
+      }
 
       if (!members.length) {
         members = await fetchMembers(receiverId);
@@ -207,7 +207,7 @@ export const editMessage = async (ctx: Context) => {
         type: "edited",
         "content.text": text,
       },
-      { new: true },
+      { returnDocument: "after" },
     ).lean<MessageInterface>({ transform: (doc) => nullToUndefined(doc) });
 
     if (!message) {
@@ -234,7 +234,7 @@ export const deleteMessage = async (ctx: Context) => {
         deletedAt: new Date(),
         $unset: { content: 1 },
       },
-      { new: true },
+      { returnDocument: "after" },
     ).lean<MessageInterface>({ transform: (doc) => nullToUndefined(doc) });
 
     if (!message) {
@@ -327,7 +327,7 @@ export const reactMessage = async (ctx: Context) => {
           },
         },
       ],
-      { new: true, updatePipeline: true },
+      { returnDocument: "after", updatePipeline: true },
     ).lean<MessageInterface>({ transform: (doc) => nullToUndefined(doc) });
 
     if (!message) {

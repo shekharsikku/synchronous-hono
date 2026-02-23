@@ -80,7 +80,7 @@ export const updateDetails = async (ctx: Context) => {
     const updatedGroup = await Group.findOneAndUpdate(
       { _id: groupId, admin: reqUser },
       { $set: updateData },
-      { new: true },
+      { returnDocument: "after" },
     );
 
     if (!updatedGroup) {
@@ -126,7 +126,9 @@ export const updateMembers = async (ctx: Context) => {
     if (add.length) updateOps.$addToSet = { members: { $each: add } };
     if (remove.length) updateOps.$pull = { members: { $in: remove } };
 
-    const updatedGroup = await Group.findOneAndUpdate({ _id: groupId, admin: reqUser }, updateOps, { new: true });
+    const updatedGroup = await Group.findOneAndUpdate({ _id: groupId, admin: reqUser }, updateOps, {
+      returnDocument: "after",
+    });
 
     if (!updatedGroup) {
       throw new HttpError(404, "Group not found or you are not authorized!");

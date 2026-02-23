@@ -34,7 +34,7 @@ export const profileSetup = async (ctx: Context) => {
       userDetails.setup = true;
     }
 
-    const updatedProfile = await User.findByIdAndUpdate(requestUser?._id, userDetails, { new: true });
+    const updatedProfile = await User.findByIdAndUpdate(requestUser?._id, userDetails, { returnDocument: "after" });
 
     if (!updatedProfile) {
       throw new HttpError(400, "Profile setup not completed!");
@@ -113,7 +113,7 @@ export const deleteImage = async (ctx: Context) => {
     const fileId = imageUrl.searchParams.get("fid");
     fileId && (await imagekitDelete(fileId));
 
-    const updatedProfile = await User.findByIdAndUpdate(requestUser?._id, { image: "" }, { new: true });
+    const updatedProfile = await User.findByIdAndUpdate(requestUser?._id, { image: "" }, { returnDocument: "after" });
 
     if (!updatedProfile) {
       throw new HttpError(400, "Error while deleting image!");
