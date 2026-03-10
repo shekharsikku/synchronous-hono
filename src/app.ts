@@ -27,8 +27,14 @@ app.use(
   }),
 );
 
+app.all("/", (ctx: Context) => {
+  return ctx.redirect(env.CORS_ORIGIN);
+});
+
 app.get("/hello", (ctx: Context) => {
-  const message = "Hono + Bun says hello! Ready to serve your requests!";
+  const to = ctx.req.query("to") ?? "Unknown";
+  const timestamp = new Date().toISOString();
+  const message = `Hono + Bun says hello to ${to} at ${timestamp}!`;
   return SuccessResponse(ctx, 200, message);
 });
 

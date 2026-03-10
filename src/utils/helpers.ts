@@ -25,7 +25,7 @@ export const generateAccess = async (ctx: Context, user?: UserInterface) => {
   await setSignedCookie(ctx, "access", accessToken, env.SIGNED_SECRET, {
     maxAge: accessExpiry,
     httpOnly: true,
-    sameSite: "strict",
+    sameSite: "none",
     secure: env.isProd,
   });
 
@@ -47,14 +47,14 @@ export const generateRefresh = async (ctx: Context, uid: Types.ObjectId, aid: Ty
   await setSignedCookie(ctx, "refresh", refreshToken, env.SIGNED_SECRET, {
     maxAge: refreshExpiry * 2,
     httpOnly: true,
-    sameSite: "Strict",
+    sameSite: "none",
     secure: env.isProd,
   });
 
   await setSignedCookie(ctx, "current", currentAuthKey, env.SIGNED_SECRET, {
     maxAge: refreshExpiry * 2,
     httpOnly: true,
-    sameSite: "strict",
+    sameSite: "none",
     secure: env.isProd,
   });
 
