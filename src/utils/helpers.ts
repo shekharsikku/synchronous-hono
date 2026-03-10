@@ -12,6 +12,12 @@ export const generateSecret = async () => {
   return createSecretKey(createHash("sha256").update(env.ACCESS_SECRET).digest());
 };
 
+export const cookieOptions = {
+  httpOnly: true,
+  sameSite: "none" as const,
+  secure: env.isProd,
+};
+
 export const generateAccess = async (ctx: Context, user?: UserInterface) => {
   const accessExpiry = env.ACCESS_EXPIRY;
 
@@ -24,9 +30,7 @@ export const generateAccess = async (ctx: Context, user?: UserInterface) => {
 
   await setSignedCookie(ctx, "access", accessToken, env.SIGNED_SECRET, {
     maxAge: accessExpiry,
-    httpOnly: true,
-    sameSite: "none",
-    secure: env.isProd,
+    ...cookieOptions,
   });
 
   return accessToken;
@@ -46,16 +50,12 @@ export const generateRefresh = async (ctx: Context, uid: Types.ObjectId, aid: Ty
 
   await setSignedCookie(ctx, "refresh", refreshToken, env.SIGNED_SECRET, {
     maxAge: refreshExpiry * 2,
-    httpOnly: true,
-    sameSite: "none",
-    secure: env.isProd,
+    ...cookieOptions,
   });
 
   await setSignedCookie(ctx, "current", currentAuthKey, env.SIGNED_SECRET, {
     maxAge: refreshExpiry * 2,
-    httpOnly: true,
-    sameSite: "none",
-    secure: env.isProd,
+    ...cookieOptions,
   });
 
   return refreshToken;

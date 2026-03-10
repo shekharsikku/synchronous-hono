@@ -8,7 +8,14 @@ import { ZodError, type ZodObject } from "zod";
 import env from "#/configs/env.js";
 import type { UserInterface } from "#/interfaces/index.js";
 import { User } from "#/models/index.js";
-import { createUserInfo, generateAccess, generateHash, generateRefresh, generateSecret } from "#/utils/helpers.js";
+import {
+  cookieOptions,
+  createUserInfo,
+  generateAccess,
+  generateHash,
+  generateRefresh,
+  generateSecret,
+} from "#/utils/helpers.js";
 import { ErrorResponse, HttpError, SuccessResponse } from "#/utils/response.js";
 
 const parseAuthKey = (authKey: any) => {
@@ -44,9 +51,9 @@ export const revokeToken = async (ctx: Context, authKey: any) => {
   } catch (error: any) {
     console.error(`Error: ${error.message}`);
   } finally {
-    deleteCookie(ctx, "access");
-    deleteCookie(ctx, "refresh");
-    deleteCookie(ctx, "current");
+    deleteCookie(ctx, "access", cookieOptions);
+    deleteCookie(ctx, "refresh", cookieOptions);
+    deleteCookie(ctx, "current", cookieOptions);
   }
 };
 
