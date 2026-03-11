@@ -3,6 +3,7 @@ import { deflateSync } from "node:zlib";
 import type { Options } from "argon2";
 import type { Context } from "hono";
 import { setSignedCookie } from "hono/cookie";
+import type { CookieOptions } from "hono/utils/cookie";
 import { CompactEncrypt, SignJWT } from "jose";
 import type { Types } from "mongoose";
 import env from "#/configs/env.js";
@@ -12,10 +13,10 @@ export const generateSecret = async () => {
   return createSecretKey(createHash("sha256").update(env.ACCESS_SECRET).digest());
 };
 
-export const cookieOptions = {
+export const cookieOptions: CookieOptions = {
   httpOnly: true,
   sameSite: "none" as const,
-  secure: env.isProd,
+  secure: true,
 };
 
 export const generateAccess = async (ctx: Context, user?: UserInterface) => {
