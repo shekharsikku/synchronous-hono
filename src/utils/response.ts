@@ -12,22 +12,18 @@ export class HttpError extends Error {
   }
 }
 
-type TypeResponse<T = any, E = any> = {
-  code?: ContentfulStatusCode;
-  success: boolean;
-  message: string;
-  data?: T;
-  error?: E;
-};
+type TypeResponse<T = unknown, E = unknown> =
+  | { success: true; message: string; data?: T }
+  | { success: false; message: string; error?: E };
 
-export const ErrorResponse = <E = any>(ctx: Context, code: ContentfulStatusCode, message: string, error?: E) => {
-  const response: TypeResponse<undefined, E> = { success: false, message };
+export const ErrorResponse = <E>(ctx: Context, code: ContentfulStatusCode, message: string, error?: E) => {
+  const response: TypeResponse<never, E> = { success: false, message };
   if (error !== undefined) response.error = error;
-  return ctx.json<TypeResponse<undefined, E>>(response, code);
+  return ctx.json<TypeResponse<never, E>>(response, code);
 };
 
-export const SuccessResponse = <T = any>(ctx: Context, code: ContentfulStatusCode, message: string, data?: T) => {
-  const response: TypeResponse<T, undefined> = { success: true, message };
+export const SuccessResponse = <T>(ctx: Context, code: ContentfulStatusCode, message: string, data?: T) => {
+  const response: TypeResponse<T, never> = { success: true, message };
   if (data !== undefined) response.data = data;
-  return ctx.json<TypeResponse<T, undefined>>(response, code);
+  return ctx.json<TypeResponse<T, never>>(response, code);
 };

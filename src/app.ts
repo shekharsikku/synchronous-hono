@@ -33,8 +33,8 @@ app.all("/", (ctx: Context) => {
 
 app.get("/hello", (ctx: Context) => {
   const to = ctx.req.query("to") ?? "Unknown";
-  const timestamp = new Date().toISOString();
-  const message = `Hono + Bun says hello to ${to} at ${timestamp}!`;
+  const ts = new Date().toISOString();
+  const message = `Hono + Bun says hello to ${to} at ${ts}!`;
   return SuccessResponse(ctx, 200, message);
 });
 
