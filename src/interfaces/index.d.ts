@@ -1,3 +1,4 @@
+import type { PinoLogger } from "hono-pino";
 import type { Document, Types } from "mongoose";
 
 export interface UserInterface extends Document {
@@ -51,6 +52,7 @@ export interface GroupInterface extends Document {
 declare module "hono" {
   interface ContextVariableMap {
     user?: UserInterface;
+    logger: PinoLogger;
   }
 
   interface HonoRequest {

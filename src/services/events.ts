@@ -1,4 +1,5 @@
 import type { Context } from "hono";
+import { logger } from "#/middlewares/index.js";
 
 type EventsClient = {
   controller: ReadableStreamDefaultController<string>;
@@ -9,19 +10,19 @@ class EventsService {
 
   connect(uid: string, controller: ReadableStreamDefaultController<string>) {
     this.clients.set(uid, { controller });
-    console.log("Event user connected:", uid);
+    logger.info("Event user connected: %s", uid);
   }
 
   disconnect(uid: string) {
     this.clients.delete(uid);
-    console.log("Event user disconnected:", uid);
+    logger.info("Event user disconnected: %s", uid);
   }
 
   send(uid: string, event: string, data: unknown) {
     const client = this.clients.get(uid);
 
     if (!client) {
-      console.log("Event client not found!");
+      logger.info("Event client not found: %s", uid);
       return;
     }
 
@@ -35,6 +36,7 @@ export const connectEvents = (ctx: Context) => {
   const uid = ctx.req.user?._id.toString();
 
   if (!uid) {
+    logger.info("Event user not authenticated!");
     return ctx.text("Unauthorized events request!", 401);
   }
 

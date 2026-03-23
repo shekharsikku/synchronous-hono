@@ -1,4 +1,5 @@
 import ImageKit from "imagekit";
+import { logger } from "#/middlewares/index.js";
 import env from "./env.js";
 
 const imagekit = new ImageKit({
@@ -12,25 +13,28 @@ export const imagekitUpload = async (imageFile: File) => {
     const fileBuffer = await imageFile.arrayBuffer();
     const fileBase64 = Buffer.from(fileBuffer).toString("base64");
 
-    const uploadResponse = await imagekit.upload({
+    const response = await imagekit.upload({
       file: fileBase64,
       fileName: imageFile.name,
       folder: "/uploads",
     });
 
-    return uploadResponse;
-  } catch (error: any) {
-    console.error(`Failed to upload image: ${error.message}`);
+    logger.info(response, "Image uploaded successfully!");
+    return response;
+  } catch (err) {
+    logger.error({ err }, "Failed to upload image!");
     return null;
   }
 };
 
 export const imagekitDelete = async (imageId: string) => {
   try {
-    const deleteResponse = await imagekit.deleteFile(imageId);
-    return deleteResponse;
-  } catch (error: any) {
-    console.error(`Failed to delete image file: ${error.message}`);
+    const response = await imagekit.deleteFile(imageId);
+
+    logger.info(response, "Image deleted successfully!");
+    return response;
+  } catch (err) {
+    logger.error({ err }, "Failed to delete image!");
     return null;
   }
 };

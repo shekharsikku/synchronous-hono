@@ -2,6 +2,7 @@ import type { Context } from "hono";
 import { connect } from "mongoose";
 import app from "#/app.js";
 import env from "#/configs/env.js";
+import { logger } from "#/middlewares/index.js";
 import { engine } from "#/server.js";
 
 app.all("/socket.io/*", (ctx: Context) => {
@@ -16,7 +17,7 @@ void (async () => {
       throw new Error("Database connection error!");
     }
 
-    console.log("\nDatabase connection success!");
+    logger.info("Database connection success!");
 
     const server = Bun.serve({
       ...engine.handler(),
@@ -25,9 +26,9 @@ void (async () => {
       maxRequestBodySize: env.BODY_LIMIT * 1024 * 1024,
     });
 
-    console.log(`Server is running at: ${server.url}`);
-  } catch (error: any) {
-    console.error(`Error: ${error.message}`);
+    logger.info("Server is running at: %s", server.url);
+  } catch (err) {
+    logger.error({ err }, "Server startup failed!");
     process.exit(1);
   }
 })();

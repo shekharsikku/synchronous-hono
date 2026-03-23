@@ -1,14 +1,15 @@
 import { type Context, Hono } from "hono";
 import { bodyLimit } from "hono/body-limit";
 import { cors } from "hono/cors";
-import { logger } from "hono/logger";
+import { pinoLogger } from "hono-pino";
 import env from "#/configs/env.js";
+import { logger } from "#/middlewares/index.js";
 import routes from "#/routes/index.js";
-import { ErrorResponse, HttpError, SuccessResponse } from "#/utils/response.js";
+import { HttpError, HttpResponse } from "#/utils/response.js";
 
 const app = new Hono({ strict: env.STRICT_MODE });
 
-app.use(logger());
+app.use(pinoLogger({ pino: logger }));
 
 app.use(
   cors({
@@ -35,23 +36,24 @@ app.get("/hello", (ctx: Context) => {
   const to = ctx.req.query("to") ?? "Unknown";
   const ts = new Date().toISOString();
   const message = `Hono + Bun says hello to ${to} at ${ts}!`;
-  return SuccessResponse(ctx, 200, message);
+  return new HttpResponse(200, message).send(ctx);
 });
 
 app.route("/api", routes);
 
-app.onError((err: Error, ctx: Context) => {
+app.onError((err: any, ctx: Context) => {
   if (err instanceof HttpError) {
-    return ErrorResponse(ctx, err.code, err.message);
+    ctx.var.logger.warn({ err }, "Handled http error!");
+    return new HttpResponse(err.code, err.message).send(ctx);
   }
-  const message = err.message || "Oops! Something went wrong!";
-  console.error(`Error: ${message}`);
-  return ErrorResponse(ctx, 500, message);
+
+  ctx.var.logger.error({ err }, "Unhandled http error!");
+  return new HttpResponse(500, "Internal server error!").send(ctx);
 });
 
 app.notFound((ctx: Context) => {
   const message = `Requested url '${ctx.req.path}' not found on the server!`;
-  return ErrorResponse(ctx, 404, message);
+  return new HttpResponse(404, message).send(ctx);
 });
 
 export default app;

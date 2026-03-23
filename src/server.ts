@@ -1,6 +1,7 @@
 import { Server as Engine } from "@socket.io/bun-engine";
 import { Server } from "socket.io";
 import env from "#/configs/env.js";
+import { logger } from "#/middlewares/index.js";
 
 export const engine = new Engine();
 
@@ -21,10 +22,10 @@ export const getSocketId = (userId: string) => {
 io.bind(engine);
 
 io.use((socket, next) => {
-  const publicKey = socket.handshake.auth.publicKey as string;
+  const publicKey = socket.handshake.auth["pk"] as string;
 
   if (publicKey !== env.SOCKET_PUBLIC) {
-    console.error("Unauthorized socket attempt:", socket.handshake);
+    logger.info("Unauthorized socket attempt: %s", socket.handshake.address);
     return next(new Error("Unauthorized socket connection!"));
   }
 
@@ -32,16 +33,16 @@ io.use((socket, next) => {
 });
 
 io.on("connection", (socket) => {
-  const userId = socket.handshake.query.userId as string;
+  const userId = socket.handshake.query["uid"] as string;
 
   if (userId) {
     if (!userSocketMap.has(userId)) {
       userSocketMap.set(userId, new Set());
     }
     userSocketMap.get(userId)?.add(socket.id);
-    console.log(`User connected: ${userId}:${socket.id}`);
+    logger.info("User connected: %s:%s", userId, socket.id);
   } else {
-    console.error(`Socket disconnected missing userId:${socket.id}`);
+    logger.info("Socket disconnected missing userId: %s", socket.id);
     socket.disconnect();
   }
 
@@ -124,10 +125,19 @@ io.on("connection", (socket) => {
     });
   });
 
+  socket.on("before:group-update", ({ updatedGroup }) => {
+    const socketIds = updatedGroup.members
+      .filter((member: string) => member !== updatedGroup.admin)
+      .flatMap((userId: string) => getSocketId(userId))
+      .filter(Boolean);
+
+    socket.to(socketIds).emit("after:group-update", { ...updatedGroup });
+  });
+
   socket.on("disconnect", () => {
     for (const [userId, sockets] of userSocketMap.entries()) {
       if (sockets.has(socket.id)) {
-        console.log(`User disconnected: ${userId}:${socket.id}`);
+        logger.info("User disconnected: %s:%s", userId, socket.id);
         sockets.delete(socket.id);
         if (sockets.size === 0) userSocketMap.delete(userId);
         break;

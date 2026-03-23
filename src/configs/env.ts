@@ -10,7 +10,6 @@ const env = cleanEnv(process.env, {
   ACCESS_EXPIRY: num(),
   REFRESH_SECRET: str(),
   REFRESH_EXPIRY: num(),
-
   SIGNED_SECRET: str(),
   SOCKET_PUBLIC: str(),
   MONGODB_URI: url(),
@@ -22,6 +21,10 @@ const env = cleanEnv(process.env, {
   NODE_ENV: str({
     choices: ["development", "production"],
     default: "development",
+  }),
+  LOG_LEVEL: str({
+    choices: ["fatal", "error", "warn", "info", "debug", "trace", "silent"],
+    default: "info",
   }),
 });
 
