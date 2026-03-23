@@ -1,9 +1,10 @@
 import { hash, verify } from "argon2";
 import type { Context } from "hono";
 import { deleteCookie, getSignedCookie } from "hono/cookie";
+import { jwtVerify } from "jose";
 import { Types } from "mongoose";
 import env from "#/configs/env.js";
-import { revokeToken } from "#/middlewares/index.js";
+import { logger } from "#/middlewares/index.js";
 import { User } from "#/models/index.js";
 import {
   argonOptions,
@@ -13,81 +14,112 @@ import {
   generateHash,
   generateRefresh,
 } from "#/utils/helpers.js";
-import { ErrorResponse, HttpError, SuccessResponse } from "#/utils/response.js";
+import { HttpError, HttpResponse } from "#/utils/response.js";
 import type { SignIn, SignUp } from "#/utils/schema.js";
 
-export const signUpUser = async (ctx: Context) => {
+const parseAuthKey = (authKey: any) => {
+  const [firstKey, secondKey] = authKey.split(":", 2);
+
+  if (!Types.ObjectId.isValid(firstKey) || !Types.ObjectId.isValid(secondKey)) {
+    throw new Error("Invalid authentication key!");
+  }
+
+  return {
+    userId: new Types.ObjectId(firstKey),
+    authId: new Types.ObjectId(secondKey),
+  };
+};
+
+const revokeToken = async (ctx: Context, authKey: any) => {
   try {
-    const { email, password } = ctx.get("validated") as SignUp;
+    const { userId, authId } = parseAuthKey(authKey);
 
-    const existsEmail = await User.exists({ email });
-
-    if (existsEmail) {
-      throw new HttpError(409, "Email already exists!");
-    }
-
-    const hashedPassword = await hash(password, argonOptions);
-
-    await User.create({ email, password: hashedPassword });
-
-    return SuccessResponse(ctx, 201, "Signed up successfully!");
-  } catch (error: any) {
-    return ErrorResponse(ctx, error.code || 500, error.message || "Error while user signup!");
+    await User.updateOne(
+      {
+        _id: userId,
+        authentication: {
+          $elemMatch: { _id: authId },
+        },
+      },
+      {
+        $pull: {
+          authentication: { _id: authId },
+        },
+      },
+    );
+  } catch (err) {
+    logger.error({ err }, "Unknown error occurred!");
+  } finally {
+    deleteCookie(ctx, "access", cookieOptions);
+    deleteCookie(ctx, "refresh", cookieOptions);
+    deleteCookie(ctx, "current", cookieOptions);
   }
 };
 
-export const signInUser = async (ctx: Context) => {
-  try {
-    const deviceId = ctx.req.header("x-device-id") ?? "unknown-device";
-    const { email, username, password } = ctx.get("validated") as SignIn;
-    const conditions = [];
+export const signUpUser = async (ctx: Context) => {
+  const { email, password } = ctx.get("validated") as SignUp;
 
-    if (email) {
-      conditions.push({ email });
-    } else if (username) {
-      conditions.push({ username });
-    } else {
-      throw new HttpError(400, "Email or Username required!");
-    }
+  const existsEmail = await User.exists({ email });
 
-    const existsUser = await User.findOne({
-      $or: conditions,
-    }).select("+password +authentication");
-
-    if (!existsUser) {
-      throw new HttpError(404, "User not exists!");
-    }
-
-    const isCorrect = await verify(existsUser.password!, password);
-
-    if (!isCorrect) {
-      throw new HttpError(403, "Incorrect password!");
-    }
-
-    const userInfo = createUserInfo(existsUser);
-    await generateAccess(ctx, userInfo);
-
-    if (!userInfo.setup) {
-      return SuccessResponse(ctx, 200, "Please, complete your profile!", userInfo);
-    }
-
-    const authorizeId = new Types.ObjectId();
-    const refreshToken = await generateRefresh(ctx, userInfo._id!, authorizeId, deviceId);
-    const hashedRefresh = await generateHash(refreshToken);
-    const refreshExpiry = new Date(Date.now() + env.REFRESH_EXPIRY * 1000);
-
-    existsUser.authentication?.push({
-      _id: authorizeId,
-      token: hashedRefresh,
-      expiry: refreshExpiry,
-    });
-
-    await existsUser.save();
-
-    return SuccessResponse(ctx, 200, "Signed in successfully!", userInfo);
-  } catch (error: any) {
-    return ErrorResponse(ctx, error.code || 500, error.message || "Error while user signin!");
+  if (existsEmail) {
+    throw new HttpError(409, "Email already exists!");
   }
+
+  const hashedPassword = await hash(password, argonOptions);
+
+  await User.create({ email, password: hashedPassword });
+
+  return new HttpResponse(201, "Signed up successfully!").send(ctx);
+};
+
+export const signInUser = async (ctx: Context) => {
+  const deviceId = ctx.req.header("x-device-id") ?? "unknown-device";
+  const { email, username, password } = ctx.get("validated") as SignIn;
+  const conditions = [];
+
+  if (email) {
+    conditions.push({ email });
+  } else if (username) {
+    conditions.push({ username });
+  } else {
+    throw new HttpError(400, "Email or Username required!");
+  }
+
+  const existsUser = await User.findOne({
+    $or: conditions,
+  }).select("+password +authentication");
+
+  if (!existsUser) {
+    throw new HttpError(404, "User not exists!");
+  }
+
+  const isCorrect = await verify(existsUser.password!, password);
+
+  if (!isCorrect) {
+    throw new HttpError(403, "Incorrect password!");
+  }
+
+  const userInfo = createUserInfo(existsUser);
+  await generateAccess(ctx, userInfo);
+
+  if (!userInfo.setup) {
+    return new HttpResponse(200, "Please, complete your profile!", { data: userInfo }).send(ctx);
+  }
+
+  const authorizeId = new Types.ObjectId();
+  const refreshToken = await generateRefresh(ctx, userInfo._id!, authorizeId, deviceId);
+  const hashedRefresh = await generateHash(refreshToken);
+  const refreshExpiry = new Date(Date.now() + env.REFRESH_EXPIRY * 1000);
+
+  existsUser.authentication?.push({
+    _id: authorizeId,
+    token: hashedRefresh,
+    expiry: refreshExpiry,
+  });
+
+  await existsUser.save();
+
+  return new HttpResponse(200, "Signed in successfully!", { data: userInfo }).send(ctx);
 };
 
 export const signOutUser = async (ctx: Context) => {
@@ -101,5 +133,89 @@ export const signOutUser = async (ctx: Context) => {
   deleteCookie(ctx, "refresh", cookieOptions);
   deleteCookie(ctx, "current", cookieOptions);
 
-  return SuccessResponse(ctx, 200, "Signed out successfully!");
+  return new HttpResponse(200, "Signed out successfully!").send(ctx);
+};
+
+export const authRefresh = async (ctx: Context) => {
+  const deviceId = ctx.req.header("x-device-id") ?? "unknown-device";
+  const refreshToken = await getSignedCookie(ctx, env.SIGNED_SECRET, "refresh");
+  const currentAuthKey = await getSignedCookie(ctx, env.SIGNED_SECRET, "current");
+
+  if (!refreshToken || !currentAuthKey) {
+    throw new HttpError(401, "Unauthorized refresh request!");
+  }
+
+  let userId: Types.ObjectId;
+  let authorizeId: Types.ObjectId;
+  let hashedRefresh: string;
+  let refreshExpiry: number | undefined;
+
+  try {
+    const parsedPayload = parseAuthKey(currentAuthKey);
+    authorizeId = parsedPayload.authId;
+
+    const refreshSecret = new TextEncoder().encode(env.REFRESH_SECRET);
+
+    const [jwtResult, hashedToken] = await Promise.all([
+      jwtVerify(refreshToken, refreshSecret),
+      generateHash(refreshToken),
+    ]);
+
+    hashedRefresh = hashedToken;
+    refreshExpiry = jwtResult.payload.exp;
+
+    if (
+      !Types.ObjectId.isValid(jwtResult.payload.uid!) ||
+      !parsedPayload.userId.equals(new Types.ObjectId(jwtResult.payload.uid)) ||
+      jwtResult.payload.jti !== deviceId
+    ) {
+      throw new Error("Refresh request mismatch!");
+    }
+
+    userId = parsedPayload.userId;
+  } catch {
+    await revokeToken(ctx, currentAuthKey);
+    throw new HttpError(403, "Please, signin again to continue!");
+  }
+
+  const currentTime = Math.floor(Date.now() / 1000);
+  const expiresAt = refreshExpiry ?? currentTime;
+
+  const authFilter = {
+    _id: userId,
+    authentication: {
+      $elemMatch: { _id: authorizeId, token: hashedRefresh },
+    },
+  };
+
+  const requestUser = await User.findOne(authFilter);
+
+  if (!requestUser) {
+    throw new HttpError(401, "Invalid authorization!");
+  }
+
+  const userInfo = createUserInfo(requestUser);
+  const shouldRotate = currentTime >= expiresAt - env.REFRESH_EXPIRY / 2;
+
+  if (shouldRotate) {
+    const newRefreshToken = await generateRefresh(ctx, userId, authorizeId, deviceId);
+    const newHashedRefresh = await generateHash(newRefreshToken);
+    const newRefreshExpiry = new Date(Date.now() + env.REFRESH_EXPIRY * 1000);
+
+    const updatedResult = await User.updateOne(authFilter, {
+      $set: {
+        "authentication.$.token": newHashedRefresh,
+        "authentication.$.expiry": newRefreshExpiry,
+      },
+    });
+
+    if (updatedResult.modifiedCount === 0) {
+      await revokeToken(ctx, currentAuthKey);
+      throw new HttpError(403, "Please, signin again to continue!");
+    }
+  }
+
+  await generateAccess(ctx, userInfo);
+
+  return new HttpResponse(200, "Token refreshed successfully!").send(ctx);
 };

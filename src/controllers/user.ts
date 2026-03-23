@@ -6,7 +6,7 @@ import { User } from "#/models/index.js";
 import { getSocketId, io } from "#/server.js";
 import { eventsService } from "#/services/events.js";
 import { argonOptions, createUserInfo, generateAccess, hasEmptyField } from "#/utils/helpers.js";
-import { ErrorResponse, HttpError, SuccessResponse } from "#/utils/response.js";
+import { HttpError, HttpResponse } from "#/utils/response.js";
 
 const profileUpdateEvents = async (userData: UserInterface) => {
   const userSocketIds = getSocketId(userData._id?.toString()!);
@@ -14,170 +14,150 @@ const profileUpdateEvents = async (userData: UserInterface) => {
 };
 
 export const profileSetup = async (ctx: Context) => {
-  try {
-    const { name, username, gender, bio } = ctx.get("validated");
-    const requestUser = ctx.req.user!;
+  const { name, username, gender, bio } = ctx.get("validated");
+  const requestUser = ctx.req.user!;
 
-    if (username !== requestUser?.username) {
-      const existsUsername = await User.exists({ username });
+  if (username !== requestUser?.username) {
+    const existsUsername = await User.exists({ username });
 
-      if (existsUsername) {
-        throw new HttpError(409, "Username already exists!");
-      }
+    if (existsUsername) {
+      throw new HttpError(409, "Username already exists!");
     }
-
-    const wasSetup = requestUser?.setup;
-    const userDetails = { name, username, gender, bio, setup: false };
-    const isCompleted = !hasEmptyField({ name, username, gender });
-
-    if (isCompleted) {
-      userDetails.setup = true;
-    }
-
-    const updatedProfile = await User.findByIdAndUpdate(requestUser?._id, userDetails, { returnDocument: "after" });
-
-    if (!updatedProfile) {
-      throw new HttpError(400, "Profile setup not completed!");
-    }
-
-    const userInfo = createUserInfo(updatedProfile);
-
-    if (!wasSetup && userInfo.setup) {
-      eventsService.send(requestUser._id.toString(), "profile-setup-complete", userInfo);
-    }
-
-    if (!userInfo.setup) {
-      return SuccessResponse(ctx, 200, "Please, complete your profile!", userInfo);
-    }
-
-    await generateAccess(ctx, userInfo);
-    await profileUpdateEvents(userInfo);
-
-    return SuccessResponse(ctx, 200, "Profile updated successfully!");
-  } catch (error: any) {
-    return ErrorResponse(ctx, error.code || 500, error.message || "Error while updating profile!");
   }
+
+  const wasSetup = requestUser?.setup;
+  const userDetails = { name, username, gender, bio, setup: false };
+  const isCompleted = !hasEmptyField({ name, username, gender });
+
+  if (isCompleted) {
+    userDetails.setup = true;
+  }
+
+  const updatedProfile = await User.findByIdAndUpdate(requestUser?._id, userDetails, { returnDocument: "after" });
+
+  if (!updatedProfile) {
+    throw new HttpError(400, "Profile setup not completed!");
+  }
+
+  const userInfo = createUserInfo(updatedProfile);
+
+  if (!wasSetup && userInfo.setup) {
+    eventsService.send(requestUser._id.toString(), "profile-setup-complete", userInfo);
+  }
+
+  if (!userInfo.setup) {
+    return new HttpResponse(200, "Please, complete your profile!").send(ctx);
+  }
+
+  await generateAccess(ctx, userInfo);
+  await profileUpdateEvents(userInfo);
+
+  return new HttpResponse(200, "Profile updated successfully!").send(ctx);
 };
 
 export const updateImage = async (ctx: Context) => {
-  try {
-    const requestUser = ctx.req.user?._id!;
+  const requestUser = ctx.req.user?._id!;
 
-    const dataBody = await ctx.req.parseBody();
-    const imageFile = dataBody["profile-image"];
+  const dataBody = await ctx.req.parseBody();
+  const imageFile = dataBody["profile-image"];
 
-    if (!imageFile || !(imageFile instanceof File)) {
-      throw new HttpError(400, "Invalid profile image file upload!");
-    }
-
-    const userProfile = await User.findById(requestUser);
-
-    if (!userProfile) {
-      throw new HttpError(404, "Can't get current user profile!");
-    }
-
-    const uploadedImage = await imagekitUpload(imageFile);
-
-    if (!uploadedImage?.url) {
-      throw new HttpError(500, "Error while uploading profile image!");
-    }
-
-    if (userProfile.image) {
-      const imageUrl = new URL(userProfile.image);
-      const fileId = imageUrl.searchParams.get("fid");
-
-      if (fileId) {
-        await imagekitDelete(fileId);
-      }
-    }
-
-    userProfile.image = `${uploadedImage.url}?fid=${uploadedImage.fileId}`;
-    await userProfile.save({ validateBeforeSave: false });
-
-    const userInfo = createUserInfo(userProfile);
-
-    await generateAccess(ctx, userInfo);
-    await profileUpdateEvents(userInfo);
-
-    return SuccessResponse(ctx, 200, "Profile image updated successfully!");
-  } catch (error: any) {
-    return ErrorResponse(ctx, error.code || 500, error.message || "Error while updating profile image!");
+  if (!imageFile || !(imageFile instanceof File)) {
+    throw new HttpError(400, "Invalid profile image file upload!");
   }
-};
 
-export const deleteImage = async (ctx: Context) => {
-  try {
-    const requestUser = ctx.req.user;
+  const userProfile = await User.findById(requestUser);
 
-    const userProfile = await User.findById(requestUser);
+  if (!userProfile) {
+    throw new HttpError(404, "Can't get current user profile!");
+  }
 
-    if (!userProfile) {
-      throw new HttpError(404, "Can't get current user profile!");
-    }
+  const uploadedImage = await imagekitUpload(imageFile);
 
-    if (!userProfile?.image) {
-      throw new HttpError(400, "Profile image is not available!");
-    }
+  if (!uploadedImage?.url) {
+    throw new HttpError(500, "Error while uploading profile image!");
+  }
 
+  if (userProfile.image) {
     const imageUrl = new URL(userProfile.image);
     const fileId = imageUrl.searchParams.get("fid");
 
     if (fileId) {
       await imagekitDelete(fileId);
     }
-
-    userProfile.image = null;
-    await userProfile.save({ validateBeforeSave: false });
-
-    const userInfo = createUserInfo(userProfile);
-
-    await generateAccess(ctx, userInfo);
-    await profileUpdateEvents(userInfo);
-
-    return SuccessResponse(ctx, 200, "Profile image deleted successfully!");
-  } catch (error: any) {
-    return ErrorResponse(ctx, error.code || 500, error.message || "Error while deleting profile image!");
   }
+
+  userProfile.image = `${uploadedImage.url}?fid=${uploadedImage.fileId}`;
+  await userProfile.save({ validateBeforeSave: false });
+
+  const userInfo = createUserInfo(userProfile);
+
+  await generateAccess(ctx, userInfo);
+  await profileUpdateEvents(userInfo);
+
+  return new HttpResponse(200, "Profile image updated successfully!").send(ctx);
+};
+
+export const deleteImage = async (ctx: Context) => {
+  const requestUser = ctx.req.user;
+
+  const userProfile = await User.findById(requestUser);
+
+  if (!userProfile) {
+    throw new HttpError(404, "Can't get current user profile!");
+  }
+
+  if (!userProfile?.image) {
+    throw new HttpError(400, "Profile image is not available!");
+  }
+
+  const imageUrl = new URL(userProfile.image);
+  const fileId = imageUrl.searchParams.get("fid");
+
+  if (fileId) {
+    await imagekitDelete(fileId);
+  }
+
+  userProfile.image = null;
+  await userProfile.save({ validateBeforeSave: false });
+
+  const userInfo = createUserInfo(userProfile);
+
+  await generateAccess(ctx, userInfo);
+  await profileUpdateEvents(userInfo);
+
+  return new HttpResponse(200, "Profile image deleted successfully!").send(ctx);
 };
 
 export const changePassword = async (ctx: Context) => {
-  try {
-    const { old_password, new_password } = ctx.get("validated");
+  const { old_password, new_password } = ctx.get("validated");
 
-    if (old_password === new_password) {
-      throw new HttpError(400, "Please, choose a different password!");
-    }
-
-    const userId = ctx.req.user?._id;
-
-    const requestUser = await User.findById(userId).select("+password");
-
-    if (!requestUser) {
-      throw new HttpError(403, "Invalid authorization!");
-    }
-
-    const isCorrect = await verify(requestUser.password!, old_password);
-
-    if (!isCorrect) {
-      throw new HttpError(403, "Incorrect old password!");
-    }
-
-    requestUser.password = await hash(new_password, argonOptions);
-    await requestUser.save({ validateBeforeSave: true });
-
-    const userInfo = createUserInfo(requestUser);
-    await generateAccess(ctx, userInfo);
-
-    return SuccessResponse(ctx, 200, "Password changed successfully!");
-  } catch (error: any) {
-    return ErrorResponse(ctx, error.code || 500, error.message || "Error while changing password!");
+  if (old_password === new_password) {
+    throw new HttpError(400, "Please, choose a different password!");
   }
+
+  const userId = ctx.req.user?._id;
+
+  const requestUser = await User.findById(userId).select("+password");
+
+  if (!requestUser) {
+    throw new HttpError(403, "Invalid authorization!");
+  }
+
+  const isCorrect = await verify(requestUser.password!, old_password);
+
+  if (!isCorrect) {
+    throw new HttpError(403, "Incorrect old password!");
+  }
+
+  requestUser.password = await hash(new_password, argonOptions);
+  await requestUser.save({ validateBeforeSave: true });
+
+  const userInfo = createUserInfo(requestUser);
+  await generateAccess(ctx, userInfo);
+
+  return new HttpResponse(200, "Password changed successfully!").send(ctx);
 };
 
 export const userInformation = async (ctx: Context) => {
-  try {
-    return SuccessResponse(ctx, 200, "User profile information!", ctx.req.user);
-  } catch (error: any) {
-    return ErrorResponse(ctx, error.code || 500, error.message || "Error while getting user info!");
-  }
+  return new HttpResponse(200, "User profile information!", { data: ctx.req.user! }).send(ctx);
 };
