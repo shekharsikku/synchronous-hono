@@ -1,18 +1,17 @@
 import { translate } from "bing-translate-api";
 import type { Context } from "hono";
 import { Types } from "mongoose";
-import type { MessageInterface } from "#/interfaces/index.js";
-import { Conversation, Message } from "#/models/index.js";
+import { Conversation, Message, type MessageType } from "#/models/index.js";
 import { getSocketId, io } from "#/server.js";
 import { HttpError, HttpResponse } from "#/utils/response.js";
-import type { Message as MessageType, Translate } from "#/utils/schema.js";
+import type { Message as MessageSchema, Translate } from "#/utils/schema.js";
 import { fetchMembers } from "./group.js";
 
 export const sendMessage = async (ctx: Context) => {
   const senderId = ctx.req.user?._id!;
   const receiverId = new Types.ObjectId(ctx.req.param("id"));
   const isGroup = ctx.req.query("type") === "group";
-  const { type, text, file, reply } = ctx.get("validated") as MessageType;
+  const { type, text, file, reply } = ctx.get("validated") as MessageSchema;
 
   const content: {
     type: "text" | "file";
@@ -166,7 +165,7 @@ export const fetchMessages = async (ctx: Context) => {
   return new HttpResponse(200, "Messages fetched successfully!", { data: messages.reverse() }).send(ctx);
 };
 
-const messageActionsEvents = async (message: MessageInterface, event: string) => {
+const messageActionsEvents = async (message: MessageType, event: string) => {
   if (message.group) {
     const members = await fetchMembers(message.group);
     const socketIds = members.flatMap((member) => getSocketId(member)).filter(Boolean);
@@ -195,7 +194,7 @@ export const editMessage = async (ctx: Context) => {
       "content.text": text,
     },
     { returnDocument: "after" },
-  ).lean<MessageInterface>({ transform: (doc) => nullToUndefined(doc) });
+  ).lean({ transform: (doc) => nullToUndefined(doc) });
 
   if (!message) {
     throw new HttpError(400, "You can't edit this message or message not found!");
@@ -218,7 +217,7 @@ export const deleteMessage = async (ctx: Context) => {
       $unset: { content: 1 },
     },
     { returnDocument: "after" },
-  ).lean<MessageInterface>({ transform: (doc) => nullToUndefined(doc) });
+  ).lean({ transform: (doc) => nullToUndefined(doc) });
 
   if (!message) {
     throw new HttpError(400, "You can't delete this message or message not found!");
@@ -307,7 +306,7 @@ export const reactMessage = async (ctx: Context) => {
       },
     ],
     { returnDocument: "after", updatePipeline: true },
-  ).lean<MessageInterface>({ transform: (doc) => nullToUndefined(doc) });
+  ).lean({ transform: (doc) => nullToUndefined(doc) });
 
   if (!message) {
     throw new HttpError(400, "Unable to react on this message or message not found!");

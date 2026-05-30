@@ -7,7 +7,11 @@ import type { CookieOptions } from "hono/utils/cookie";
 import { CompactEncrypt, SignJWT } from "jose";
 import type { Types } from "mongoose";
 import env from "#/configs/env.js";
-import type { UserInterface } from "#/interfaces/index.js";
+import type { UserDocument } from "#/models/index.js";
+
+export type UserInfo =
+  | Pick<UserDocument, "_id" | "email" | "username" | "setup">
+  | Omit<UserDocument, "password" | "authentication">;
 
 export const generateSecret = async () => {
   return createSecretKey(createHash("sha256").update(env.ACCESS_SECRET).digest());
@@ -19,7 +23,7 @@ export const cookieOptions: CookieOptions = {
   secure: true,
 };
 
-export const generateAccess = async (ctx: Context, user?: UserInterface) => {
+export const generateAccess = async (ctx: Context, user?: UserInfo) => {
   const accessExpiry = env.ACCESS_EXPIRY;
 
   const accessPayload = deflateSync(JSON.stringify(user));
@@ -70,24 +74,16 @@ export const hasEmptyField = (fields: object) => {
   return Object.values(fields).some((value) => value === "" || value === undefined || value === null);
 };
 
-export const createUserInfo = (user: UserInterface) => {
-  let userInfo: Partial<UserInterface>;
-
-  if (user.setup) {
-    userInfo = {
-      ...user.toObject(),
-      password: undefined,
-      authentication: undefined,
-    };
-  } else {
-    userInfo = {
+export const createUserInfo = (user: UserDocument) => {
+  if (!user.setup) {
+    return {
       _id: user._id,
       email: user.email,
       setup: user.setup,
     };
   }
-
-  return userInfo as UserInterface;
+  const { password, authentication, ...safeUser } = user.toObject();
+  return safeUser;
 };
 
 export const argonOptions: Options = {

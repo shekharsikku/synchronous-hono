@@ -1,20 +1,20 @@
 import { hash, verify } from "argon2";
 import type { Context } from "hono";
 import { imagekitDelete, imagekitUpload } from "#/configs/imagekit.js";
-import type { UserInterface } from "#/interfaces/index.js";
 import { User } from "#/models/index.js";
 import { getSocketId, io } from "#/server.js";
 import { eventsService } from "#/services/events.js";
-import { argonOptions, createUserInfo, generateAccess, hasEmptyField } from "#/utils/helpers.js";
+import { argonOptions, createUserInfo, generateAccess, hasEmptyField, type UserInfo } from "#/utils/helpers.js";
 import { HttpError, HttpResponse } from "#/utils/response.js";
+import type { Password, Profile } from "#/utils/schema.js";
 
-const profileUpdateEvents = async (userData: UserInterface) => {
+const profileUpdateEvents = async (userData: UserInfo) => {
   const userSocketIds = getSocketId(userData._id?.toString()!);
   io.to(userSocketIds).emit("profile:update", userData);
 };
 
 export const profileSetup = async (ctx: Context) => {
-  const { name, username, gender, bio } = ctx.get("validated");
+  const { name, username, gender, bio } = ctx.get("validated") as Profile;
   const requestUser = ctx.req.user!;
 
   if (username !== requestUser?.username) {
@@ -129,7 +129,7 @@ export const deleteImage = async (ctx: Context) => {
 };
 
 export const changePassword = async (ctx: Context) => {
-  const { old_password, new_password } = ctx.get("validated");
+  const { old_password, new_password } = ctx.get("validated") as Password;
 
   if (old_password === new_password) {
     throw new HttpError(400, "Please, choose a different password!");

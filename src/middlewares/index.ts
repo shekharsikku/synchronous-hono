@@ -4,13 +4,12 @@ import { getSignedCookie } from "hono/cookie";
 import { rateLimiter } from "hono-rate-limiter";
 import { compactDecrypt } from "jose";
 import pino from "pino";
-import { ZodError, type ZodType } from "zod";
+import type { ZodType } from "zod";
 import env from "#/configs/env.js";
-import type { UserInterface } from "#/interfaces/index.js";
-import { generateSecret } from "#/utils/helpers.js";
-import { HttpError, HttpResponse } from "#/utils/response.js";
+import { generateSecret, type UserInfo } from "#/utils/helpers.js";
+import { HttpError } from "#/utils/response.js";
 
-const authorizeAccess = async (ctx: Context): Promise<UserInterface> => {
+const authorizeAccess = async (ctx: Context): Promise<UserInfo> => {
   const accessToken = await getSignedCookie(ctx, env.SIGNED_SECRET, "access");
   if (!accessToken) throw new Error("No access token available!");
 
@@ -40,17 +39,9 @@ export const authEvents = async (ctx: Context, next: Next) => {
 export const validate =
   <T>(schema: ZodType<T>) =>
   async (ctx: Context, next: Next) => {
-    try {
-      const payload = await ctx.req.json();
-      ctx.set("validated", schema.parse(payload));
-      return await next();
-    } catch (error: any) {
-      const response = new HttpResponse(400, "Validation error occurred!", { error });
-      if (error instanceof ZodError && error.name === "ZodError") {
-        response.error = JSON.parse(error.message);
-      }
-      return response.send(ctx);
-    }
+    const payload = await ctx.req.json();
+    ctx.set("validated", schema.parse(payload));
+    return await next();
   };
 
 export const limiter = (minutes = 10, limit = 1000) => {

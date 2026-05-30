@@ -2,6 +2,7 @@ import { type Context, Hono } from "hono";
 import { bodyLimit } from "hono/body-limit";
 import { cors } from "hono/cors";
 import { pinoLogger } from "hono-pino";
+import { ZodError } from "zod";
 import env from "#/configs/env.js";
 import { logger } from "#/middlewares/index.js";
 import routes from "#/routes/index.js";
@@ -42,12 +43,15 @@ app.get("/hello", (ctx: Context) => {
 app.route("/api", routes);
 
 app.onError((err: any, ctx: Context) => {
+  if (err instanceof ZodError) {
+    return new HttpResponse(400, "Validation error occurred!", { error: err.issues }).send(ctx);
+  }
+
   if (err instanceof HttpError) {
-    ctx.var.logger.warn({ err }, "Handled http error!");
     return new HttpResponse(err.code, err.message).send(ctx);
   }
 
-  ctx.var.logger.error({ err }, "Unhandled http error!");
+  ctx.var.logger.error({ err }, "Unhandled server error!");
   return new HttpResponse(500, "Internal server error!").send(ctx);
 });
 
