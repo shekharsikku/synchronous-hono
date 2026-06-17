@@ -5,6 +5,7 @@ import authRoutes from "./auth.js";
 import contactRoute from "./contact.js";
 import groupRoutes from "./group.js";
 import messageRoutes from "./message.js";
+import subscriptionRouter from "./subscription.js";
 import userRoutes from "./user.js";
 
 const routes = new Hono()
@@ -14,6 +15,7 @@ const routes = new Hono()
   .route("/contact", contactRoute)
   .route("/group", groupRoutes)
   .route("/message", messageRoutes)
+  .route("/push", subscriptionRouter)
   .get("/events", authEvents, connectEvents);
 
 export default routes;
