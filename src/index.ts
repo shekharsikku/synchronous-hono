@@ -4,6 +4,7 @@ import app from "#/app.js";
 import env from "#/configs/env.js";
 import { logger } from "#/middlewares/index.js";
 import { engine } from "#/server.js";
+import jobs from "#/services/jobs.js";
 
 app.all("/socket.io/*", (ctx: Context) => {
   return engine.handleRequest(ctx.req.raw, ctx.env);
@@ -18,6 +19,8 @@ void (async () => {
     }
 
     logger.info("Database connection success!");
+
+    jobs.start();
 
     const server = Bun.serve({
       ...engine.handler(),

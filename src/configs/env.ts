@@ -5,6 +5,9 @@ const env = cleanEnv(process.env, {
   IMAGEKIT_PUBLIC_KEY: str(),
   IMAGEKIT_PRIVATE_KEY: str(),
   IMAGEKIT_URL_ENDPOINT: url(),
+  VAPID_MAILTO: str(),
+  VAPID_PUBLIC_KEY: str(),
+  VAPID_PRIVATE_KEY: str(),
 
   ACCESS_SECRET: str(),
   ACCESS_EXPIRY: num(),

@@ -1,34 +1,60 @@
 import { translate } from "bing-translate-api";
 import type { Context } from "hono";
 import { Types } from "mongoose";
-import { Conversation, Message, type MessageType } from "#/models/index.js";
+import type { ConversationDocument, MessageDocument, MessageType } from "#/models/index.js";
+import { Conversation, Message } from "#/models/index.js";
 import { getSocketId, io } from "#/server.js";
+import { sendPushNotification } from "#/utils/push.js";
 import { HttpError, HttpResponse } from "#/utils/response.js";
 import type { Message as MessageSchema, Translate } from "#/utils/schema.js";
 import { fetchMembers } from "./group.js";
+
+const buildContent = ({ type, text, file }: Omit<MessageSchema, "reply">) => {
+  if (type === "text" && text) return { type, text };
+  if (type === "file" && file) return { type, file };
+  return { type };
+};
+
+const emitMessage = (
+  sockets: string[],
+  message: MessageDocument,
+  targetId: string,
+  targetType: "contact" | "group",
+  interaction: Date,
+) => {
+  if (!sockets.length) return;
+  io.to(sockets).emit("message:receive", message);
+  io.to(sockets).emit("conversation:updated", {
+    _id: targetId,
+    type: targetType,
+    interaction,
+  });
+};
+
+const resolveMembers = async (
+  conversation: ConversationDocument | null,
+  groupId: Types.ObjectId,
+): Promise<string[]> => {
+  if (conversation) {
+    const populated = await conversation.populate("participants");
+    const members = (populated.participants?.[0] as { members?: Types.ObjectId[] })?.members ?? [];
+    if (members.length) return members.map((id) => id.toString());
+  }
+  return fetchMembers(groupId);
+};
 
 export const sendMessage = async (ctx: Context) => {
   const senderId = ctx.req.user?._id!;
   const receiverId = new Types.ObjectId(ctx.req.param("id"));
   const isGroup = ctx.req.query("type") === "group";
   const { type, text, file, reply } = ctx.get("validated") as MessageSchema;
-
-  const content: {
-    type: "text" | "file";
-    text?: string;
-    file?: string;
-  } = { type };
-
-  if (type === "text" && text) content.text = text;
-  if (type === "file" && file) content.file = file;
-
   const interaction = new Date();
 
   let [message, conversation] = await Promise.all([
     Message.create({
       sender: senderId,
       ...(isGroup ? { group: receiverId } : { recipient: receiverId }),
-      content: content,
+      content: buildContent({ type, text, file }),
       ...(reply && { reply: new Types.ObjectId(reply) }),
     }),
     Conversation.findOneAndUpdate(
@@ -41,69 +67,39 @@ export const sendMessage = async (ctx: Context) => {
     ),
   ]);
 
-  let members: string[] = [];
-
   if (!conversation) {
     conversation = await Conversation.create({
       participants: isGroup ? [receiverId] : [senderId, receiverId],
       models: isGroup ? "Group" : "User",
       interaction: interaction,
     });
-
-    if (isGroup) {
-      members = await fetchMembers(receiverId);
-    }
   }
 
   if (isGroup) {
-    if (!members.length && conversation) {
-      const populated = await conversation.populate("participants");
-      members = (populated.participants?.[0] as any)?.members ?? [];
-    }
-
-    if (!members.length) {
-      members = await fetchMembers(receiverId);
-    }
-
-    const socketIds = members.flatMap((member) => getSocketId(member)).filter(Boolean);
-
-    /** for update new message */
-    io.to(socketIds).emit("message:receive", message);
-
-    /** for update last chat contact */
-    io.to(socketIds).emit("conversation:updated", {
-      _id: receiverId,
-      type: "group",
-      interaction,
-    });
+    const groupMembers = await resolveMembers(conversation, receiverId);
+    const membersSockets = groupMembers.flatMap(getSocketId).filter(Boolean);
+    emitMessage(membersSockets, message, receiverId.toString(), "group", interaction);
   } else {
-    const socketEventInfo = [
-      {
-        userId: message.sender.toString(),
-        targetId: message.recipient?.toString()!,
-      },
-      {
-        userId: message.recipient?.toString()!,
-        targetId: message.sender.toString(),
-      },
-    ];
+    const messageSender = message.sender.toString();
+    const messageRecipient = message.recipient!.toString();
+    const senderSockets = getSocketId(messageSender);
+    const recipientSockets = getSocketId(messageRecipient);
 
-    for (const { userId, targetId } of socketEventInfo) {
-      const userSocketIds = getSocketId(userId);
+    if (senderSockets.length) {
+      emitMessage(senderSockets, message, messageRecipient, "contact", interaction);
+    }
 
-      if (userSocketIds.length > 0) {
-        /** for update new message */
-        io.to(userSocketIds).emit("message:receive", message);
-
-        /** for update last chat contact */
-        io.to(userSocketIds).emit("conversation:updated", {
-          _id: targetId,
-          type: "contact",
-          interaction,
-        });
-      }
+    if (recipientSockets.length) {
+      emitMessage(recipientSockets, message, messageSender, "contact", interaction);
+    } else {
+      sendPushNotification(receiverId, {
+        title: ctx.req.user?.name ?? ctx.req.user?.username ?? "Someone",
+        body: "Sent you a new message.",
+        data: { sid: messageSender },
+      }).catch(() => {});
     }
   }
+
   return new HttpResponse(201, "Message sent successfully!").send(ctx);
 };
 

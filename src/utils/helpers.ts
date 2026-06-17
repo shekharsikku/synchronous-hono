@@ -10,7 +10,7 @@ import env from "#/configs/env.js";
 import type { UserDocument } from "#/models/index.js";
 
 export type UserInfo =
-  | Pick<UserDocument, "_id" | "email" | "username" | "setup">
+  | Pick<UserDocument, "_id" | "name" | "email" | "username" | "setup">
   | Omit<UserDocument, "password" | "authentication">;
 
 export const generateSecret = async () => {

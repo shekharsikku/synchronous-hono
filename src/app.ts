@@ -2,11 +2,14 @@ import { type Context, Hono } from "hono";
 import { bodyLimit } from "hono/body-limit";
 import { cors } from "hono/cors";
 import { pinoLogger } from "hono-pino";
+import webpush from "web-push";
 import { ZodError } from "zod";
 import env from "#/configs/env.js";
 import { logger } from "#/middlewares/index.js";
 import routes from "#/routes/index.js";
 import { HttpError, HttpResponse } from "#/utils/response.js";
+
+webpush.setVapidDetails(env.VAPID_MAILTO, env.VAPID_PUBLIC_KEY, env.VAPID_PRIVATE_KEY);
 
 const app = new Hono({ strict: env.STRICT_MODE });
 
