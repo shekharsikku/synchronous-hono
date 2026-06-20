@@ -2,7 +2,7 @@ import type { Context } from "hono";
 import { Types } from "mongoose";
 import { imagekitDelete, imagekitUpload } from "#/configs/imagekit.js";
 import { Conversation, Group, User } from "#/models/index.js";
-import { getSocketId, io } from "#/server.js";
+import { emitEvent, getSockets } from "#/server.js";
 import { HttpError, HttpResponse } from "#/utilities/response.js";
 import type { CreateGroup, UpdateDetails, UpdateMembers } from "#/utilities/schema.js";
 
@@ -40,10 +40,10 @@ export const createGroup = async (ctx: Context) => {
     members: groupData.members.map((id) => new Types.ObjectId(id)),
   });
 
-  const socketIds = newGroup.members.flatMap((member) => getSocketId(member.toString())).filter(Boolean);
+  const sockets = newGroup.members.flatMap((member) => getSockets(member.toString())).filter(Boolean);
 
   /** Notify to all members after group created */
-  io.to(socketIds).emit("group:created", {
+  emitEvent(sockets, "group:created", {
     ...newGroup.toJSON(),
     interaction: new Date().toISOString(),
   });
@@ -86,6 +86,14 @@ export const updateDetails = async (ctx: Context) => {
   return new HttpResponse(200, "Group details updated successfully!", { data: updatedGroup }).send(ctx);
 };
 
+const toObjectIds = (ids: string[]) =>
+  ids.map((id) => {
+    if (!Types.ObjectId.isValid(id)) {
+      throw new HttpError(400, `Invalid ObjectId: ${id}`);
+    }
+    return new Types.ObjectId(id);
+  });
+
 export const updateMembers = async (ctx: Context) => {
   const groupId = ctx.req.param("id");
   const { add, remove } = ctx.get("validated") as UpdateMembers;
@@ -99,28 +107,35 @@ export const updateMembers = async (ctx: Context) => {
     throw new HttpError(400, "Admin cannot be removed from the group!");
   }
 
-  const updateMembers = [...add, ...remove];
+  const addIds = toObjectIds(add);
+  const removeIds = toObjectIds(remove);
+  const memberIds = [...add, ...remove];
 
-  if (updateMembers.length > 0) {
-    const existingUsers = await User.find({
-      _id: { $in: updateMembers },
-    }).select("_id");
-    const validUserIds = existingUsers.map((cur) => cur._id.toString());
-    const invalidIds = updateMembers.filter((cur) => !validUserIds.includes(cur));
+  const existingUsers = new Set((await User.distinct("_id", { _id: { $in: memberIds } })).map(String));
+  const missingUsers = memberIds.filter((id) => !existingUsers.has(id));
 
-    if (invalidIds.length > 0) {
-      throw new HttpError(400, `Invalid user IDs: ${invalidIds.join(", ")}`);
-    }
+  if (missingUsers.length > 0) {
+    throw new HttpError(404, `Users not found: ${missingUsers.join(", ")}`);
   }
 
-  const updateOps: any = {};
-
-  if (add.length) updateOps.$addToSet = { members: { $each: add } };
-  if (remove.length) updateOps.$pull = { members: { $in: remove } };
-
-  const updatedGroup = await Group.findOneAndUpdate({ _id: groupId!, admin: reqUser }, updateOps, {
-    returnDocument: "after",
-  });
+  const updatedGroup = await Group.findOneAndUpdate(
+    { _id: groupId, admin: reqUser },
+    [
+      {
+        $set: {
+          members: {
+            $setUnion: [
+              {
+                $setDifference: ["$members", removeIds],
+              },
+              addIds,
+            ],
+          },
+        },
+      },
+    ],
+    { returnDocument: "after", updatePipeline: true },
+  );
 
   if (!updatedGroup) {
     throw new HttpError(404, "Group not found or you are not authorized!");

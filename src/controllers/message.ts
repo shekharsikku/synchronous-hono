@@ -3,7 +3,7 @@ import type { Context } from "hono";
 import { Types } from "mongoose";
 import type { ConversationDocument, MessageContent, MessageDocument, MessageType } from "#/models/index.js";
 import { Conversation, Message } from "#/models/index.js";
-import { getSocketId, io } from "#/server.js";
+import { emitEvent, getSockets } from "#/server.js";
 import { sendPushNotification } from "#/utilities/push.js";
 import { HttpError, HttpResponse } from "#/utilities/response.js";
 import type { Message as MessageSchema, Translate } from "#/utilities/schema.js";
@@ -22,9 +22,8 @@ const emitMessage = (
   targetType: "contact" | "group",
   interaction: Date,
 ) => {
-  if (!sockets.length) return;
-  io.to(sockets).emit("message:receive", message);
-  io.to(sockets).emit("conversation:updated", {
+  emitEvent(sockets, "message:receive", message);
+  emitEvent(sockets, "conversation:updated", {
     _id: targetId,
     type: targetType,
     interaction,
@@ -77,13 +76,13 @@ export const sendMessage = async (ctx: Context) => {
 
   if (isGroup) {
     const groupMembers = await resolveMembers(conversation, receiverId);
-    const membersSockets = groupMembers.flatMap(getSocketId).filter(Boolean);
+    const membersSockets = groupMembers.flatMap(getSockets).filter(Boolean);
     emitMessage(membersSockets, message, receiverId.toString(), "group", interaction);
   } else {
     const messageSender = message.sender.toString();
     const messageRecipient = message.recipient!.toString();
-    const senderSockets = getSocketId(messageSender);
-    const recipientSockets = getSocketId(messageRecipient);
+    const senderSockets = getSockets(messageSender);
+    const recipientSockets = getSockets(messageRecipient);
 
     if (senderSockets.length) {
       emitMessage(senderSockets, message, messageRecipient, "contact", interaction);
@@ -164,13 +163,11 @@ export const fetchMessages = async (ctx: Context) => {
 const messageActionsEvents = async (message: MessageType, event: string) => {
   if (message.group) {
     const members = await fetchMembers(message.group);
-    const socketIds = members.flatMap((member) => getSocketId(member)).filter(Boolean);
-    io.to(socketIds).emit(event, message);
+    const sockets = members.flatMap(getSockets).filter(Boolean);
+    emitEvent(sockets, event, message);
   } else {
-    const socketIds = [message.sender, message.recipient!]
-      .flatMap((uid) => getSocketId(uid.toString()))
-      .filter(Boolean);
-    io.to(socketIds).emit(event, message);
+    const sockets = [message.sender, message.recipient!].flatMap((uid) => getSockets(uid.toString())).filter(Boolean);
+    emitEvent(sockets, event, message);
   }
 };
 

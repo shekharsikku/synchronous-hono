@@ -2,15 +2,15 @@ import { hash, verify } from "argon2";
 import type { Context } from "hono";
 import { imagekitDelete, imagekitUpload } from "#/configs/imagekit.js";
 import { User } from "#/models/index.js";
-import { getSocketId, io } from "#/server.js";
+import { emitEvent, getSockets } from "#/server.js";
 import { eventsService } from "#/services/events.js";
 import { argonOptions, createUserInfo, generateAccess, hasEmptyField, type UserInfo } from "#/utilities/helpers.js";
 import { HttpError, HttpResponse } from "#/utilities/response.js";
 import type { Password, Profile } from "#/utilities/schema.js";
 
 const profileUpdateEvents = async (userData: UserInfo) => {
-  const userSocketIds = getSocketId(userData._id?.toString()!);
-  io.to(userSocketIds).emit("profile:update", userData);
+  const sockets = getSockets(userData._id.toString());
+  emitEvent(sockets, "profile:update", userData);
 };
 
 export const profileSetup = async (ctx: Context) => {
