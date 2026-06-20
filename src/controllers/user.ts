@@ -82,7 +82,7 @@ export const updateImage = async (ctx: Context) => {
     const fileId = imageUrl.searchParams.get("fid");
 
     if (fileId) {
-      await imagekitDelete(fileId);
+      imagekitDelete(fileId).catch(() => {});
     }
   }
 
@@ -114,7 +114,7 @@ export const deleteImage = async (ctx: Context) => {
   const fileId = imageUrl.searchParams.get("fid");
 
   if (fileId) {
-    await imagekitDelete(fileId);
+    imagekitDelete(fileId).catch(() => {});
   }
 
   userProfile.image = null;

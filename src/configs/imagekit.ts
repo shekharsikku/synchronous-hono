@@ -8,18 +8,18 @@ const imagekit = new ImageKit({
   urlEndpoint: env.IMAGEKIT_URL_ENDPOINT,
 });
 
-export const imagekitUpload = async (imageFile: File) => {
+export const imagekitUpload = async (file: File, folder = "/uploads") => {
   try {
-    const fileBuffer = await imageFile.arrayBuffer();
-    const fileBase64 = Buffer.from(fileBuffer).toString("base64");
+    const buffer = Buffer.from(await file.arrayBuffer());
 
     const response = await imagekit.upload({
-      file: fileBase64,
-      fileName: imageFile.name,
-      folder: "/uploads",
+      file: buffer,
+      fileName: file.name,
+      folder: folder,
+      useUniqueFileName: true,
     });
 
-    logger.info(response, "Image uploaded successfully!");
+    logger.debug({ response }, "Image uploaded successfully!");
     return response;
   } catch (err) {
     logger.error({ err }, "Failed to upload image!");
@@ -27,11 +27,11 @@ export const imagekitUpload = async (imageFile: File) => {
   }
 };
 
-export const imagekitDelete = async (imageId: string) => {
+export const imagekitDelete = async (fid: string) => {
   try {
-    const response = await imagekit.deleteFile(imageId);
+    const response = await imagekit.deleteFile(fid);
 
-    logger.info(response, "Image deleted successfully!");
+    logger.debug({ response }, "Image deleted successfully!");
     return response;
   } catch (err) {
     logger.error({ err }, "Failed to delete image!");
