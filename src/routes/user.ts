@@ -1,7 +1,7 @@
 import { Hono } from "hono";
 import { changePassword, deleteImage, profileSetup, updateImage, userInformation } from "#/controllers/user.js";
 import { authAccess, limiter, validate } from "#/middlewares/index.js";
-import { passwordSchema, profileSchema } from "#/utils/schema.js";
+import { passwordSchema, profileSchema } from "#/utilities/schema.js";
 
 const user = new Hono()
   .use(limiter(10, 50))

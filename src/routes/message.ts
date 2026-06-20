@@ -10,7 +10,7 @@ import {
   translateMessage,
 } from "#/controllers/message.js";
 import { authAccess, limiter, validate } from "#/middlewares/index.js";
-import { messageSchema, translateSchema } from "#/utils/schema.js";
+import { messageSchema, translateSchema } from "#/utilities/schema.js";
 
 const message = new Hono()
   .get("/:id", limiter(1, 20), authAccess, getMessages)

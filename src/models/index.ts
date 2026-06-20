@@ -1,6 +1,6 @@
 export type { ConversationDocument, ConversationType } from "#/models/conversation.js";
 export type { GroupDocument, GroupType } from "#/models/group.js";
-export type { MessageDocument, MessageType } from "#/models/message.js";
+export type { MessageContent, MessageDocument, MessageType } from "#/models/message.js";
 export type { SubscriptionDocument, SubscriptionType } from "#/models/subscription.js";
 export type { UserDocument, UserType } from "#/models/user.ts";
 

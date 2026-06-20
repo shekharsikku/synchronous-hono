@@ -7,7 +7,7 @@ import { ZodError } from "zod";
 import env from "#/configs/env.js";
 import { logger } from "#/middlewares/index.js";
 import routes from "#/routes/index.js";
-import { HttpError, HttpResponse } from "#/utils/response.js";
+import { HttpError, HttpResponse } from "#/utilities/response.js";
 
 webpush.setVapidDetails(env.VAPID_MAILTO, env.VAPID_PUBLIC_KEY, env.VAPID_PRIVATE_KEY);
 

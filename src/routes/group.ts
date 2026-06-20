@@ -8,7 +8,7 @@ import {
   updateMembers,
 } from "#/controllers/group.js";
 import { authAccess, limiter, validate } from "#/middlewares/index.js";
-import { createGroupSchema, updateDetailsSchema, updateMembersSchema } from "#/utils/schema.js";
+import { createGroupSchema, updateDetailsSchema, updateMembersSchema } from "#/utilities/schema.js";
 
 const group = new Hono()
   .post("/create", limiter(10, 5), validate(createGroupSchema), authAccess, createGroup)

@@ -4,9 +4,9 @@ import { imagekitDelete, imagekitUpload } from "#/configs/imagekit.js";
 import { User } from "#/models/index.js";
 import { getSocketId, io } from "#/server.js";
 import { eventsService } from "#/services/events.js";
-import { argonOptions, createUserInfo, generateAccess, hasEmptyField, type UserInfo } from "#/utils/helpers.js";
-import { HttpError, HttpResponse } from "#/utils/response.js";
-import type { Password, Profile } from "#/utils/schema.js";
+import { argonOptions, createUserInfo, generateAccess, hasEmptyField, type UserInfo } from "#/utilities/helpers.js";
+import { HttpError, HttpResponse } from "#/utilities/response.js";
+import type { Password, Profile } from "#/utilities/schema.js";
 
 const profileUpdateEvents = async (userData: UserInfo) => {
   const userSocketIds = getSocketId(userData._id?.toString()!);

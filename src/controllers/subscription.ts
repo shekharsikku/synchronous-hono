@@ -1,7 +1,7 @@
 import type { Context } from "hono";
 import { Subscription } from "#/models/index.js";
-import { HttpError, HttpResponse } from "#/utils/response.js";
-import type { Subscribe, Unsubscribe } from "#/utils/schema.js";
+import { HttpError, HttpResponse } from "#/utilities/response.js";
+import type { Subscribe, Unsubscribe } from "#/utilities/schema.js";
 
 export const subscribe = async (ctx: Context) => {
   const userId = ctx.req.user?._id!;

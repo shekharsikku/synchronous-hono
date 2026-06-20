@@ -1,7 +1,7 @@
 import type { Context } from "hono";
 import { Types } from "mongoose";
 import { Conversation, User } from "#/models/index.js";
-import { HttpError, HttpResponse } from "#/utils/response.js";
+import { HttpError, HttpResponse } from "#/utilities/response.js";
 
 export const searchContact = async (ctx: Context) => {
   const search = ctx.req.query("search");

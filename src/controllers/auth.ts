@@ -13,9 +13,9 @@ import {
   generateAccess,
   generateHash,
   generateRefresh,
-} from "#/utils/helpers.js";
-import { HttpError, HttpResponse } from "#/utils/response.js";
-import type { SignIn, SignUp } from "#/utils/schema.js";
+} from "#/utilities/helpers.js";
+import { HttpError, HttpResponse } from "#/utilities/response.js";
+import type { SignIn, SignUp } from "#/utilities/schema.js";
 
 const parseAuthKey = (authKey: any) => {
   const [firstKey, secondKey] = authKey.split(":", 2);

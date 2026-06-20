@@ -1,7 +1,7 @@
 import { Hono } from "hono";
 import { authRefresh, signInUser, signOutUser, signUpUser } from "#/controllers/auth.js";
 import { limiter, validate } from "#/middlewares/index.js";
-import { signInSchema, signUpSchema } from "#/utils/schema.js";
+import { signInSchema, signUpSchema } from "#/utilities/schema.js";
 
 const auth = new Hono()
   .post("/sign-up", limiter(10, 5), validate(signUpSchema), signUpUser)

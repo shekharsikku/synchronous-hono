@@ -6,8 +6,8 @@ import { compactDecrypt } from "jose";
 import pino from "pino";
 import type { ZodType } from "zod";
 import env from "#/configs/env.js";
-import { generateSecret, type UserInfo } from "#/utils/helpers.js";
-import { HttpError } from "#/utils/response.js";
+import { generateSecret, type UserInfo } from "#/utilities/helpers.js";
+import { HttpError } from "#/utilities/response.js";
 
 const authorizeAccess = async (ctx: Context): Promise<UserInfo> => {
   const accessToken = await getSignedCookie(ctx, env.SIGNED_SECRET, "access");

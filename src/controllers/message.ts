@@ -1,15 +1,15 @@
 import { translate } from "bing-translate-api";
 import type { Context } from "hono";
 import { Types } from "mongoose";
-import type { ConversationDocument, MessageDocument, MessageType } from "#/models/index.js";
+import type { ConversationDocument, MessageContent, MessageDocument, MessageType } from "#/models/index.js";
 import { Conversation, Message } from "#/models/index.js";
 import { getSocketId, io } from "#/server.js";
-import { sendPushNotification } from "#/utils/push.js";
-import { HttpError, HttpResponse } from "#/utils/response.js";
-import type { Message as MessageSchema, Translate } from "#/utils/schema.js";
+import { sendPushNotification } from "#/utilities/push.js";
+import { HttpError, HttpResponse } from "#/utilities/response.js";
+import type { Message as MessageSchema, Translate } from "#/utilities/schema.js";
 import { fetchMembers } from "./group.js";
 
-const buildContent = ({ type, text, file }: Omit<MessageSchema, "reply">) => {
+const buildContent = ({ type, text, file }: MessageContent) => {
   if (type === "text" && text) return { type, text };
   if (type === "file" && file) return { type, file };
   return { type };

@@ -1,5 +1,5 @@
 import type { PinoLogger } from "hono-pino";
-import type { UserInfo } from "#/utils/helpers.ts";
+import type { UserInfo } from "#/utilities/helpers.ts";
 
 declare module "hono" {
   interface ContextVariableMap {

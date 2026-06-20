@@ -3,8 +3,8 @@ import { Types } from "mongoose";
 import { imagekitDelete, imagekitUpload } from "#/configs/imagekit.js";
 import { Conversation, Group, User } from "#/models/index.js";
 import { getSocketId, io } from "#/server.js";
-import { HttpError, HttpResponse } from "#/utils/response.js";
-import type { CreateGroup, UpdateDetails, UpdateMembers } from "#/utils/schema.js";
+import { HttpError, HttpResponse } from "#/utilities/response.js";
+import type { CreateGroup, UpdateDetails, UpdateMembers } from "#/utilities/schema.js";
 
 export const createGroup = async (ctx: Context) => {
   const groupData = ctx.get("validated") as CreateGroup;
