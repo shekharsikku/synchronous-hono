@@ -1,4 +1,4 @@
-import { createHash, createSecretKey, randomBytes } from "node:crypto";
+import { randomBytes } from "node:crypto";
 import { deflateSync } from "node:zlib";
 import type { Options } from "argon2";
 import type { Context } from "hono";
@@ -8,14 +8,11 @@ import { CompactEncrypt, SignJWT } from "jose";
 import type { Types } from "mongoose";
 import env from "#/configs/env.js";
 import type { UserDocument } from "#/models/index.js";
+import { accessSecret, encryptAuth, refreshSecret } from "./crypto.js";
 
 export type UserInfo =
   | Pick<UserDocument, "_id" | "name" | "email" | "username" | "setup">
   | Omit<UserDocument, "password" | "authentication">;
-
-export const generateSecret = async () => {
-  return createSecretKey(createHash("sha256").update(env.ACCESS_SECRET).digest());
-};
 
 export const cookieOptions: CookieOptions = {
   httpOnly: true,
@@ -25,9 +22,7 @@ export const cookieOptions: CookieOptions = {
 
 export const generateAccess = async (ctx: Context, user?: UserInfo) => {
   const accessExpiry = env.ACCESS_EXPIRY;
-
   const accessPayload = deflateSync(JSON.stringify(user));
-  const accessSecret = await generateSecret();
 
   const accessToken = await new CompactEncrypt(accessPayload)
     .setProtectedHeader({ alg: "dir", enc: "A256GCM" })
@@ -43,8 +38,7 @@ export const generateAccess = async (ctx: Context, user?: UserInfo) => {
 
 export const generateRefresh = async (ctx: Context, uid: Types.ObjectId, aid: Types.ObjectId, jti: string) => {
   const refreshExpiry = env.REFRESH_EXPIRY;
-  const refreshSecret = new TextEncoder().encode(env.REFRESH_SECRET);
-  const currentAuthKey = `${uid.toString()}:${aid.toString()}`;
+  const currentAuthKey = encryptAuth(uid.toString(), aid.toString());
 
   const refreshToken = await new SignJWT({ uid: uid.toString() })
     .setProtectedHeader({ alg: "HS512" })
@@ -64,10 +58,6 @@ export const generateRefresh = async (ctx: Context, uid: Types.ObjectId, aid: Ty
   });
 
   return refreshToken;
-};
-
-export const generateHash = async (token: string) => {
-  return createHash("sha256").update(token).digest("hex");
 };
 
 export const hasEmptyField = (fields: object) => {

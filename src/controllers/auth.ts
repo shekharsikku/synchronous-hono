@@ -6,28 +6,19 @@ import { Types } from "mongoose";
 import env from "#/configs/env.js";
 import { logger } from "#/middlewares/index.js";
 import { User } from "#/models/index.js";
-import {
-  argonOptions,
-  cookieOptions,
-  createUserInfo,
-  generateAccess,
-  generateHash,
-  generateRefresh,
-} from "#/utilities/helpers.js";
+import { decryptAuth, generateHash, refreshSecret } from "#/utilities/crypto.js";
+import { argonOptions, cookieOptions, createUserInfo, generateAccess, generateRefresh } from "#/utilities/helpers.js";
 import { HttpError, HttpResponse } from "#/utilities/response.js";
 import type { SignIn, SignUp } from "#/utilities/schema.js";
 
-const parseAuthKey = (authKey: any) => {
-  const [firstKey, secondKey] = authKey.split(":", 2);
+const parseAuthKey = (token: string) => {
+  const { uid, aid } = decryptAuth(token);
 
-  if (!Types.ObjectId.isValid(firstKey) || !Types.ObjectId.isValid(secondKey)) {
+  if (!Types.ObjectId.isValid(uid) || !Types.ObjectId.isValid(aid)) {
     throw new Error("Invalid authentication key!");
   }
 
-  return {
-    userId: new Types.ObjectId(firstKey),
-    authId: new Types.ObjectId(secondKey),
-  };
+  return { userId: new Types.ObjectId(uid), authId: new Types.ObjectId(aid) };
 };
 
 const revokeToken = async (ctx: Context, authKey: any) => {
@@ -110,7 +101,7 @@ export const signInUser = async (ctx: Context) => {
 
   const authorizeId = new Types.ObjectId();
   const refreshToken = await generateRefresh(ctx, userInfo._id!, authorizeId, deviceId);
-  const hashedRefresh = await generateHash(refreshToken);
+  const hashedRefresh = generateHash(refreshToken);
   const refreshExpiry = new Date(Date.now() + env.REFRESH_EXPIRY * 1000);
 
   existsUser.authentication?.push({
@@ -150,7 +141,6 @@ export const authRefresh = async (ctx: Context) => {
   const verifiedData = await (async () => {
     try {
       const parsedPayload = parseAuthKey(currentAuthKey);
-      const refreshSecret = new TextEncoder().encode(env.REFRESH_SECRET);
 
       const [jwtResult, hashedToken] = await Promise.all([
         jwtVerify<{ uid: string }>(refreshToken, refreshSecret, {
@@ -201,7 +191,7 @@ export const authRefresh = async (ctx: Context) => {
 
   if (shouldRotate) {
     const newRefreshToken = await generateRefresh(ctx, userId, authorizeId, deviceId);
-    const newHashedRefresh = await generateHash(newRefreshToken);
+    const newHashedRefresh = generateHash(newRefreshToken);
     const newRefreshExpiry = new Date(Date.now() + env.REFRESH_EXPIRY * 1000);
 
     const updatedResult = await User.updateOne(authFilter, {

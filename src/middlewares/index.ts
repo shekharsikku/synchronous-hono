@@ -6,14 +6,14 @@ import { compactDecrypt } from "jose";
 import pino from "pino";
 import type { ZodType } from "zod";
 import env from "#/configs/env.js";
-import { generateSecret, type UserInfo } from "#/utilities/helpers.js";
+import { accessSecret } from "#/utilities/crypto.js";
+import type { UserInfo } from "#/utilities/helpers.js";
 import { HttpError } from "#/utilities/response.js";
 
 const authorizeAccess = async (ctx: Context): Promise<UserInfo> => {
   const accessToken = await getSignedCookie(ctx, env.SIGNED_SECRET, "access");
   if (!accessToken) throw new Error("No access token available!");
 
-  const accessSecret = await generateSecret();
   const decryptedAccess = await compactDecrypt(accessToken, accessSecret);
   return JSON.parse(inflateSync(decryptedAccess.plaintext).toString());
 };
