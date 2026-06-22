@@ -1,4 +1,5 @@
 import { bodyLimit } from "hono/body-limit";
+import { serveStatic } from "hono/bun";
 import { cors } from "hono/cors";
 import { requestId } from "hono/request-id";
 import { pinoLogger } from "hono-pino";
@@ -14,6 +15,7 @@ webpush.setVapidDetails(env.VAPID_MAILTO, env.VAPID_PUBLIC_KEY, env.VAPID_PRIVAT
 
 const app = createRouter();
 
+app.use("/favicon.ico", serveStatic({ path: "./favicon.ico", precompressed: true }));
 app.use(requestId());
 app.use(pinoLogger({ pino: logger }));
 
