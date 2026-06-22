@@ -1,8 +1,18 @@
-import { createCipheriv, createDecipheriv, createHash, createSecretKey, randomBytes, scryptSync } from "node:crypto";
+import {
+  createCipheriv,
+  createDecipheriv,
+  createHash,
+  createSecretKey,
+  randomBytes,
+  scryptSync,
+} from "node:crypto";
 import env from "#/configs/env.js";
 
-export const accessSecret = createSecretKey(createHash("sha256").update(env.ACCESS_SECRET).digest());
-export const refreshSecret = createSecretKey(createHash("sha256").update(env.REFRESH_SECRET).digest());
+const generateBuffer = (secret: string) => createHash("sha256").update(secret).digest();
+
+export const accessSecret = createSecretKey(generateBuffer(env.ACCESS_SECRET));
+
+export const refreshSecret = createSecretKey(generateBuffer(env.REFRESH_SECRET));
 
 const signedSecret = scryptSync(env.SIGNED_SECRET, "current-auth-secret", 32);
 

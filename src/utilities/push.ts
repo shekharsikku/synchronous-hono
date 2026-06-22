@@ -9,7 +9,10 @@ interface PushPayload {
 }
 const STALE_STATUS_CODES = new Set([404, 410]);
 
-export const sendPushNotification = async <T extends PushPayload>(userId: Types.ObjectId, payload: T) => {
+export const sendPushNotification = async <T extends PushPayload>(
+  userId: Types.ObjectId,
+  payload: T,
+) => {
   try {
     const subscriptions = await Subscription.find({ userId }).lean();
     if (subscriptions.length === 0) return;

@@ -67,8 +67,8 @@ io.on("connection", (socket) => {
   });
 
   socket.on("call:request", ({ target, details, type }) => {
-    const socket = getSockets(target).at(-1)!;
-    emitEvent([socket], "call:request", { details, type });
+    const socket = getSockets(target).at(-1);
+    if (socket) emitEvent([socket], "call:request", { details, type });
   });
 
   socket.on("call:response", ({ target, details, action }) => {
@@ -96,8 +96,8 @@ io.on("connection", (socket) => {
   });
 
   socket.on("share:request", ({ target, details, file }) => {
-    const socket = getSockets(target).at(-1)!;
-    emitEvent([socket], "share:request", { details, file });
+    const socket = getSockets(target).at(-1);
+    if (socket) emitEvent([socket], "share:request", { details, file });
   });
 
   socket.on("file:request", ({ target, details, action }) => {

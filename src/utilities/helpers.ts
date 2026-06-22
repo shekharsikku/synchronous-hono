@@ -10,17 +10,13 @@ import env from "#/configs/env.js";
 import type { UserDocument } from "#/models/index.js";
 import { accessSecret, encryptAuth, refreshSecret } from "./crypto.js";
 
-export type UserInfo =
-  | Pick<UserDocument, "_id" | "name" | "email" | "username" | "setup">
-  | Omit<UserDocument, "password" | "authentication">;
-
 export const cookieOptions: CookieOptions = {
   httpOnly: true,
   sameSite: "none" as const,
   secure: true,
 };
 
-export const generateAccess = async (ctx: Context, user?: UserInfo) => {
+export const generateAccess = async (ctx: Context, user: UserInfo) => {
   const accessExpiry = env.ACCESS_EXPIRY;
   const accessPayload = deflateSync(JSON.stringify(user));
 
@@ -36,7 +32,12 @@ export const generateAccess = async (ctx: Context, user?: UserInfo) => {
   return accessToken;
 };
 
-export const generateRefresh = async (ctx: Context, uid: Types.ObjectId, aid: Types.ObjectId, jti: string) => {
+export const generateRefresh = async (
+  ctx: Context,
+  uid: Types.ObjectId,
+  aid: Types.ObjectId,
+  jti: string,
+) => {
   const refreshExpiry = env.REFRESH_EXPIRY;
   const currentAuthKey = encryptAuth(uid.toString(), aid.toString());
 
@@ -61,7 +62,9 @@ export const generateRefresh = async (ctx: Context, uid: Types.ObjectId, aid: Ty
 };
 
 export const hasEmptyField = (fields: object) => {
-  return Object.values(fields).some((value) => value === "" || value === undefined || value === null);
+  return Object.values(fields).some(
+    (value) => value === "" || value === undefined || value === null,
+  );
 };
 
 export const createUserInfo = (user: UserDocument) => {
@@ -69,12 +72,26 @@ export const createUserInfo = (user: UserDocument) => {
     return {
       _id: user._id,
       email: user.email,
+      name: user.name ?? null,
+      username: user.username ?? null,
       setup: user.setup,
     };
   }
-  const { password, authentication, ...safeUser } = user.toObject();
-  return safeUser;
+  return {
+    _id: user._id,
+    email: user.email,
+    name: user.name ?? null,
+    username: user.username ?? null,
+    gender: user.gender ?? null,
+    image: user.image ?? null,
+    bio: user.bio ?? null,
+    setup: user.setup,
+    createdAt: user.createdAt,
+    updatedAt: user.updatedAt,
+  };
 };
+
+export type UserInfo = ReturnType<typeof createUserInfo>;
 
 export const argonOptions: Options = {
   hashLength: 48,

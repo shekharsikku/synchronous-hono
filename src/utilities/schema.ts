@@ -1,4 +1,4 @@
-import * as z from "zod";
+import { z } from "zod";
 
 export const signUpSchema = z.object({
   email: z.email({ error: "Invalid email address!" }),
@@ -17,7 +17,7 @@ export const signInSchema = z
   .object({
     email: z.email().optional(),
     username: z.string().optional(),
-    password: z.string(),
+    password: z.string().min(1),
   })
   .refine((data) => data.email || data.username, {
     error: "Email or Username required!",
@@ -34,7 +34,7 @@ export const profileSchema = z.object({
       error:
         "Only lowercase letters, numbers, hyphens, and underscores are allowed, with no spaces or special characters at the start/end!",
     }),
-  gender: z.enum(["Male", "Female", "Other"]),
+  gender: z.enum(["Male", "Female", "Other"]).default("Other"),
   bio: z.string(),
 });
 
@@ -76,11 +76,6 @@ export const messageSchema = z
     }
   });
 
-export const translateSchema = z.object({
-  message: z.string(),
-  language: z.string(),
-});
-
 export const createGroupSchema = z.object({
   name: z.string().min(3).max(30),
   description: z.string().min(5).max(50),
@@ -110,15 +105,3 @@ export const subscribeSchema = z.object({
 });
 
 export const unsubscribeSchema = subscribeSchema.pick({ endpoint: true });
-
-export type SignUp = z.infer<typeof signUpSchema>;
-export type SignIn = z.infer<typeof signInSchema>;
-export type Profile = z.infer<typeof profileSchema>;
-export type Password = z.infer<typeof passwordSchema>;
-export type Message = z.infer<typeof messageSchema>;
-export type Translate = z.infer<typeof translateSchema>;
-export type CreateGroup = z.infer<typeof createGroupSchema>;
-export type UpdateDetails = z.infer<typeof updateDetailsSchema>;
-export type UpdateMembers = z.infer<typeof updateMembersSchema>;
-export type Subscribe = z.infer<typeof subscribeSchema>;
-export type Unsubscribe = z.infer<typeof unsubscribeSchema>;
