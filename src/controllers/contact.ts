@@ -1,36 +1,29 @@
-import type { Context } from "hono";
 import { Types } from "mongoose";
 import { Conversation, User } from "#/models/index.js";
-import { HttpError, HttpResponse } from "#/utilities/response.js";
+import type { AppRouteHandler } from "#/openapi/types.js";
+import type { AvailableContactRoute, FetchContactRoute, FetchContactsRoute, SearchContactRoute } from "#/routes/contact.js";
+import { HttpResponse, HttpStatusCodes } from "#/utilities/http/index.js";
 
-export const searchContact = async (ctx: Context) => {
-  const search = ctx.req.query("search");
+export const searchContact: AppRouteHandler<SearchContactRoute> = async (ctx) => {
+  const { search } = ctx.req.valid("query");
 
   if (!search) {
-    throw new HttpError(400, "Search query is required!");
+    return HttpResponse.error(ctx, HttpStatusCodes.BAD_REQUEST, "Search query can't empty!");
   }
 
   const terms = search.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
   const regex = new RegExp(terms, "i");
 
   const result = await User.find({
-    $and: [
-      { _id: { $ne: ctx.req.user?._id! } },
-      { setup: true },
-      { $or: [{ name: regex }, { username: regex }, { email: regex }] },
-    ],
+    $and: [{ _id: { $ne: ctx.req.user?._id! } }, { setup: true }, { $or: [{ name: regex }, { username: regex }, { email: regex }] }],
   })
     .select("-setup -createdAt -updatedAt -__v")
     .lean();
 
-  if (result.length === 0) {
-    throw new HttpError(404, "No any user found!");
-  }
-
-  return new HttpResponse(200, "Available contacts!", { data: result }).send(ctx);
+  return HttpResponse.success(ctx, HttpStatusCodes.OK, "Contacts searched successfully!", result);
 };
 
-export const availableContact = async (ctx: Context) => {
+export const availableContact: AppRouteHandler<AvailableContactRoute> = async (ctx) => {
   const contacts = await User.find({
     _id: { $ne: ctx.req.user?._id! },
     setup: true,
@@ -38,14 +31,10 @@ export const availableContact = async (ctx: Context) => {
     .select("-setup -createdAt -updatedAt -__v")
     .lean();
 
-  if (contacts.length === 0) {
-    throw new HttpError(404, "No any contact available!");
-  }
-
-  return new HttpResponse(200, "Contacts fetched successfully!", { data: contacts }).send(ctx);
+  return HttpResponse.success(ctx, HttpStatusCodes.OK, "Contacts fetched successfully!", contacts);
 };
 
-export const fetchContacts = async (ctx: Context) => {
+export const fetchContacts: AppRouteHandler<FetchContactsRoute> = async (ctx) => {
   const uid = new Types.ObjectId(ctx.req.user?._id);
 
   const contacts = await Conversation.aggregate([
@@ -93,17 +82,17 @@ export const fetchContacts = async (ctx: Context) => {
     { $match: { _id: { $ne: null } } },
   ]);
 
-  return new HttpResponse(200, "Contacts fetched successfully!", { data: contacts }).send(ctx);
+  return HttpResponse.success(ctx, HttpStatusCodes.OK, "Contacts fetched successfully!", contacts);
 };
 
-export const fetchContact = async (ctx: Context) => {
-  const userId = ctx.req.param("id");
+export const fetchContact: AppRouteHandler<FetchContactRoute> = async (ctx) => {
+  const uid = ctx.req.param("id");
 
-  const userContact = await User.findById(userId).select("-setup -createdAt -updatedAt -__v");
+  const contact = await User.findById(uid).select("-setup -createdAt -updatedAt -__v");
 
-  if (!userContact) {
-    throw new HttpError(404, "Contact not found!");
+  if (!contact) {
+    return HttpResponse.error(ctx, HttpStatusCodes.NOT_FOUND, "Contact not found!");
   }
 
-  return new HttpResponse(200, "Contact fetched successfully!", { data: userContact }).send(ctx);
+  return HttpResponse.success(ctx, HttpStatusCodes.OK, "Contact fetched successfully!", contact);
 };

@@ -6,10 +6,11 @@ import { Types } from "mongoose";
 import env from "#/configs/env.js";
 import { logger } from "#/middlewares/index.js";
 import { User } from "#/models/index.js";
+import type { AppRouteHandler } from "#/openapi/index.js";
+import type { RefreshRoute, SignInRoute, SignOutRoute, SignUpRoute } from "#/routes/auth.js";
 import { decryptAuth, generateHash, refreshSecret } from "#/utilities/crypto.js";
 import { argonOptions, cookieOptions, createUserInfo, generateAccess, generateRefresh } from "#/utilities/helpers.js";
-import { HttpError, HttpResponse } from "#/utilities/response.js";
-import type { SignIn, SignUp } from "#/utilities/schema.js";
+import { HttpError, HttpResponse, HttpStatusCodes } from "#/utilities/http/index.js";
 
 const parseAuthKey = (token: string) => {
   const { uid, aid } = decryptAuth(token);
@@ -21,7 +22,7 @@ const parseAuthKey = (token: string) => {
   return { userId: new Types.ObjectId(uid), authId: new Types.ObjectId(aid) };
 };
 
-const revokeToken = async (ctx: Context, authKey: any) => {
+export const revokeToken = async <C extends Context>(ctx: C, authKey: any) => {
   try {
     const { userId, authId } = parseAuthKey(authKey);
 
@@ -47,27 +48,27 @@ const revokeToken = async (ctx: Context, authKey: any) => {
   }
 };
 
-export const signUpUser = async (ctx: Context) => {
-  const { email, password } = ctx.get("validated") as SignUp;
+export const signUpUser: AppRouteHandler<SignUpRoute> = async (ctx) => {
+  const { email, password } = ctx.req.valid("json");
 
   const existsEmail = await User.exists({ email });
 
   if (existsEmail) {
-    throw new HttpError(409, "Email already exists!");
+    return HttpResponse.error(ctx, HttpStatusCodes.CONFLICT, "Email already exists!");
   }
 
-  const hashedPassword = await hash(password, argonOptions);
+  const hashed = await hash(password, argonOptions);
 
-  const newUser = await User.create({ email, password: hashedPassword });
+  const newUser = await User.create({ email, password: hashed });
   const userInfo = createUserInfo(newUser);
   await generateAccess(ctx, userInfo);
 
-  return new HttpResponse(201, "Signed up successfully!", { data: newUser }).send(ctx);
+  return HttpResponse.success(ctx, HttpStatusCodes.CREATED, "Signed up successfully!", userInfo);
 };
 
-export const signInUser = async (ctx: Context) => {
+export const signInUser: AppRouteHandler<SignInRoute> = async (ctx) => {
   const deviceId = ctx.req.header("x-device-id") ?? "unknown-device";
-  const { email, username, password } = ctx.get("validated") as SignIn;
+  const { email, username, password } = ctx.req.valid("json");
   const conditions = [];
 
   if (email) {
@@ -75,32 +76,26 @@ export const signInUser = async (ctx: Context) => {
   } else if (username) {
     conditions.push({ username });
   } else {
-    throw new HttpError(400, "Email or Username required!");
+    return HttpResponse.error(ctx, HttpStatusCodes.BAD_REQUEST, "Required email or username!");
   }
 
   const existsUser = await User.findOne({
     $or: conditions,
   }).select("+password +authentication");
 
-  if (!existsUser) {
-    throw new HttpError(404, "User not exists!");
-  }
-
-  const isCorrect = await verify(existsUser.password!, password);
-
-  if (!isCorrect) {
-    throw new HttpError(403, "Incorrect password!");
+  if (!existsUser || !(await verify(existsUser.password, password))) {
+    return HttpResponse.error(ctx, HttpStatusCodes.UNAUTHORIZED, "Invalid credentials!");
   }
 
   const userInfo = createUserInfo(existsUser);
   await generateAccess(ctx, userInfo);
 
   if (!userInfo.setup) {
-    return new HttpResponse(200, "Please, complete your profile!", { data: userInfo }).send(ctx);
+    return HttpResponse.success(ctx, HttpStatusCodes.OK, "Complete your profile!", userInfo);
   }
 
   const authorizeId = new Types.ObjectId();
-  const refreshToken = await generateRefresh(ctx, userInfo._id!, authorizeId, deviceId);
+  const refreshToken = await generateRefresh(ctx, userInfo._id, authorizeId, deviceId);
   const hashedRefresh = generateHash(refreshToken);
   const refreshExpiry = new Date(Date.now() + env.REFRESH_EXPIRY * 1000);
 
@@ -112,10 +107,10 @@ export const signInUser = async (ctx: Context) => {
 
   await existsUser.save();
 
-  return new HttpResponse(200, "Signed in successfully!", { data: userInfo }).send(ctx);
+  return HttpResponse.success(ctx, HttpStatusCodes.OK, "Signed in successfully!", userInfo);
 };
 
-export const signOutUser = async (ctx: Context) => {
+export const signOutUser: AppRouteHandler<SignOutRoute> = async (ctx) => {
   const currentAuthKey = await getSignedCookie(ctx, env.SIGNED_SECRET, "current");
 
   if (currentAuthKey) {
@@ -126,16 +121,16 @@ export const signOutUser = async (ctx: Context) => {
   deleteCookie(ctx, "refresh", cookieOptions);
   deleteCookie(ctx, "current", cookieOptions);
 
-  return new HttpResponse(200, "Signed out successfully!").send(ctx);
+  return HttpResponse.success(ctx, HttpStatusCodes.OK, "Signed out successfully!");
 };
 
-export const authRefresh = async (ctx: Context) => {
+export const authRefresh: AppRouteHandler<RefreshRoute> = async (ctx) => {
   const deviceId = ctx.req.header("x-device-id") ?? "unknown-device";
   const refreshToken = await getSignedCookie(ctx, env.SIGNED_SECRET, "refresh");
   const currentAuthKey = await getSignedCookie(ctx, env.SIGNED_SECRET, "current");
 
   if (!refreshToken || !currentAuthKey) {
-    throw new HttpError(401, "Unauthorized refresh request!");
+    return HttpResponse.error(ctx, HttpStatusCodes.UNAUTHORIZED, "Unauthorized request!");
   }
 
   const verifiedData = await (async () => {
@@ -165,7 +160,7 @@ export const authRefresh = async (ctx: Context) => {
       };
     } catch {
       await revokeToken(ctx, currentAuthKey);
-      throw new HttpError(403, "Please, signin again to continue!");
+      throw new HttpError(HttpStatusCodes.UNAUTHORIZED, "Please, sign in again!");
     }
   })();
 
@@ -183,7 +178,7 @@ export const authRefresh = async (ctx: Context) => {
   const requestUser = await User.findOne(authFilter);
 
   if (!requestUser) {
-    throw new HttpError(401, "Invalid authorization!");
+    return HttpResponse.error(ctx, HttpStatusCodes.UNAUTHORIZED, "Please, sign in again!");
   }
 
   const userInfo = createUserInfo(requestUser);
@@ -203,11 +198,11 @@ export const authRefresh = async (ctx: Context) => {
 
     if (updatedResult.modifiedCount === 0) {
       await revokeToken(ctx, currentAuthKey);
-      throw new HttpError(403, "Please, signin again to continue!");
+      return HttpResponse.error(ctx, HttpStatusCodes.UNAUTHORIZED, "Please, sign in again!");
     }
   }
 
   await generateAccess(ctx, userInfo);
 
-  return new HttpResponse(200, "Token refreshed successfully!").send(ctx);
+  return HttpResponse.success(ctx, HttpStatusCodes.OK, "Refreshed successfully!", userInfo);
 };

@@ -1,12 +1,21 @@
 import { translate } from "bing-translate-api";
-import type { Context } from "hono";
 import { Types } from "mongoose";
 import type { ConversationDocument, MessageContent, MessageDocument, MessageType } from "#/models/index.js";
 import { Conversation, Message } from "#/models/index.js";
+import type { AppRouteHandler } from "#/openapi/types.js";
+import type {
+  DeleteMessageRoute,
+  DeleteMessagesRoute,
+  EditMessageRoute,
+  FetchMessageRoute,
+  GetMessageRoute,
+  ReactMessageRoute,
+  SendMessageRoute,
+  TranslateMessageRoute,
+} from "#/routes/message.js";
 import { emitEvent, getSockets } from "#/server.js";
+import { HttpResponse, HttpStatusCodes } from "#/utilities/http/index.js";
 import { sendPushNotification } from "#/utilities/push.js";
-import { HttpError, HttpResponse } from "#/utilities/response.js";
-import type { Message as MessageSchema, Translate } from "#/utilities/schema.js";
 import { fetchMembers } from "./group.js";
 
 const buildContent = ({ type, text, file }: MessageContent) => {
@@ -15,13 +24,7 @@ const buildContent = ({ type, text, file }: MessageContent) => {
   return { type };
 };
 
-const emitMessage = (
-  sockets: string[],
-  message: MessageDocument,
-  targetId: string,
-  targetType: "contact" | "group",
-  interaction: Date,
-) => {
+const emitMessage = (sockets: string[], message: MessageDocument, targetId: string, targetType: "contact" | "group", interaction: Date) => {
   emitEvent(sockets, "message:receive", message);
   emitEvent(sockets, "conversation:updated", {
     _id: targetId,
@@ -30,10 +33,7 @@ const emitMessage = (
   });
 };
 
-const resolveMembers = async (
-  conversation: ConversationDocument | null,
-  groupId: Types.ObjectId,
-): Promise<string[]> => {
+const resolveMembers = async (conversation: ConversationDocument | null, groupId: Types.ObjectId): Promise<string[]> => {
   if (conversation) {
     const populated = await conversation.populate("participants");
     const members = (populated.participants?.[0] as { members?: Types.ObjectId[] })?.members ?? [];
@@ -42,11 +42,11 @@ const resolveMembers = async (
   return fetchMembers(groupId);
 };
 
-export const sendMessage = async (ctx: Context) => {
+export const sendMessage: AppRouteHandler<SendMessageRoute> = async (ctx) => {
   const senderId = ctx.req.user?._id!;
-  const receiverId = new Types.ObjectId(ctx.req.param("id"));
-  const isGroup = ctx.req.query("type") === "group";
-  const { type, text, file, reply } = ctx.get("validated") as MessageSchema;
+  const receiverId = new Types.ObjectId(ctx.req.valid("param").id);
+  const isGroup = ctx.req.valid("query").type === "group";
+  const { type, text, file, reply } = ctx.req.valid("json");
   const interaction = new Date();
 
   let [message, conversation] = await Promise.all([
@@ -99,7 +99,7 @@ export const sendMessage = async (ctx: Context) => {
     }
   }
 
-  return new HttpResponse(201, "Message sent successfully!").send(ctx);
+  return HttpResponse.success(ctx, HttpStatusCodes.CREATED, "Message sent successfully!", message);
 };
 
 /** Transform null → undefined in response payload only */
@@ -111,10 +111,10 @@ const nullToUndefined = (obj: Record<string, any>) => {
   return obj;
 };
 
-export const getMessages = async (ctx: Context) => {
+export const getMessages: AppRouteHandler<GetMessageRoute> = async (ctx) => {
   const sender = ctx.req.user?._id!;
-  const target = ctx.req.param("id")!;
-  const isGroup = ctx.req.query("group") === "true" || false;
+  const target = ctx.req.valid("param").id;
+  const isGroup = ctx.req.valid("query").group;
 
   const query = isGroup
     ? { group: target }
@@ -127,16 +127,16 @@ export const getMessages = async (ctx: Context) => {
 
   const messages = await Message.find(query)
     .sort({ createdAt: -1 })
+    .limit(20)
     .lean({ transform: (doc) => nullToUndefined(doc) });
 
-  return new HttpResponse(200, "Messages fetched successfully!", { data: messages.reverse() }).send(ctx);
+  return HttpResponse.success(ctx, HttpStatusCodes.OK, "Messages fetched successfully!", messages.reverse());
 };
 
-export const fetchMessages = async (ctx: Context) => {
-  const sender = ctx.req.user?._id;
-  const target = ctx.req.param("id");
-  const { before, group, limit = 10 } = ctx.req.query();
-  const isGroup = (group as string) === "true" || false;
+export const fetchMessages: AppRouteHandler<FetchMessageRoute> = async (ctx) => {
+  const sender = ctx.req.user?._id!;
+  const target = ctx.req.valid("param").id;
+  const { before, group: isGroup, limit } = ctx.req.valid("query");
 
   const query: any = isGroup
     ? { group: target }
@@ -148,16 +148,16 @@ export const fetchMessages = async (ctx: Context) => {
       };
 
   if (before) {
-    query.createdAt = { $lt: new Date(before as string) };
+    query.createdAt = { $lt: new Date(before) };
   }
 
   const messages = await Message.find(query)
     .sort({ createdAt: -1 })
-    .limit(limit as number)
+    .limit(limit)
     .lean({ transform: (doc) => nullToUndefined(doc) });
 
   /* Reverse to show oldest → newest in UI */
-  return new HttpResponse(200, "Messages fetched successfully!", { data: messages.reverse() }).send(ctx);
+  return HttpResponse.success(ctx, HttpStatusCodes.OK, "Messages fetched successfully!", messages.reverse());
 };
 
 const messageActionsEvents = async (message: MessageType, event: string) => {
@@ -171,17 +171,17 @@ const messageActionsEvents = async (message: MessageType, event: string) => {
   }
 };
 
-export const editMessage = async (ctx: Context) => {
-  const userId = ctx.req.user?._id!;
-  const msgId = ctx.req.param("id");
-  const { text } = await ctx.req.json();
+export const editMessage: AppRouteHandler<EditMessageRoute> = async (ctx) => {
+  const uid = ctx.req.user?._id!;
+  const mid = ctx.req.valid("param").id;
+  const { text } = ctx.req.valid("json");
 
-  if (!text) {
-    throw new HttpError(400, "Text content is required for editing!");
+  if (!text.trim()) {
+    return HttpResponse.error(ctx, HttpStatusCodes.BAD_REQUEST, "Text content is required!");
   }
 
   const message = await Message.findOneAndUpdate(
-    { _id: msgId!, sender: userId, "content.type": "text" },
+    { _id: mid, sender: uid, "content.type": "text" },
     {
       type: "edited",
       "content.text": text,
@@ -190,20 +190,20 @@ export const editMessage = async (ctx: Context) => {
   ).lean({ transform: (doc) => nullToUndefined(doc) });
 
   if (!message) {
-    throw new HttpError(400, "You can't edit this message or message not found!");
+    return HttpResponse.error(ctx, HttpStatusCodes.BAD_REQUEST, "You can't edit this message!");
   }
 
   await messageActionsEvents(message, "message:edited");
 
-  return new HttpResponse(200, "Message edited successfully!").send(ctx);
+  return HttpResponse.success(ctx, HttpStatusCodes.OK, "Message edited successfully!");
 };
 
-export const deleteMessage = async (ctx: Context) => {
-  const userId = ctx.req.user?._id!;
-  const msgId = ctx.req.param("id");
+export const deleteMessage: AppRouteHandler<DeleteMessageRoute> = async (ctx) => {
+  const uid = ctx.req.user?._id!;
+  const mid = ctx.req.valid("param").id;
 
   const message = await Message.findOneAndUpdate(
-    { _id: msgId!, sender: userId },
+    { _id: mid, sender: uid },
     {
       type: "deleted",
       deletedAt: new Date(),
@@ -213,25 +213,25 @@ export const deleteMessage = async (ctx: Context) => {
   ).lean({ transform: (doc) => nullToUndefined(doc) });
 
   if (!message) {
-    throw new HttpError(400, "You can't delete this message or message not found!");
+    return HttpResponse.error(ctx, HttpStatusCodes.BAD_REQUEST, "You can't delete this message!");
   }
 
   await messageActionsEvents(message, "message:remove");
 
-  return new HttpResponse(200, "Message deleted successfully!").send(ctx);
+  return HttpResponse.success(ctx, HttpStatusCodes.OK, "Message deleted successfully!");
 };
 
-export const reactMessage = async (ctx: Context) => {
+export const reactMessage: AppRouteHandler<ReactMessageRoute> = async (ctx) => {
   const by = ctx.req.user?._id!;
-  const msgId = ctx.req.param("id");
-  const { emoji } = await ctx.req.json();
+  const mid = ctx.req.valid("param").id;
+  const { emoji } = ctx.req.valid("json");
 
-  if (!by || !emoji) {
-    throw new HttpError(400, "Emoji is required for reacting!");
+  if (!emoji.trim()) {
+    return HttpResponse.error(ctx, HttpStatusCodes.BAD_REQUEST, "Emoji is required for reacting!");
   }
 
   const message = await Message.findOneAndUpdate(
-    { _id: msgId! },
+    { _id: mid },
     [
       {
         $set: {
@@ -302,17 +302,17 @@ export const reactMessage = async (ctx: Context) => {
   ).lean({ transform: (doc) => nullToUndefined(doc) });
 
   if (!message) {
-    throw new HttpError(400, "Unable to react on this message or message not found!");
+    return HttpResponse.error(ctx, HttpStatusCodes.BAD_REQUEST, "Unable to react on this message!");
   }
 
   await messageActionsEvents(message, "message:reacted");
 
-  return new HttpResponse(200, "Message reacted successfully!").send(ctx);
+  return HttpResponse.success(ctx, HttpStatusCodes.OK, "Message reacted successfully!", message);
 };
 
-export const deleteMessages = async (ctx: Context) => {
+export const deleteMessages: AppRouteHandler<DeleteMessagesRoute> = async (ctx) => {
   const userId = ctx.req.user?._id!;
-  const before = Number(ctx.req.query("before") ?? 1) * 24;
+  const before = ctx.req.valid("query").before * 24;
 
   const hoursAgo = new Date();
   hoursAgo.setHours(hoursAgo.getHours() - before);
@@ -322,21 +322,21 @@ export const deleteMessages = async (ctx: Context) => {
     createdAt: { $lt: hoursAgo },
   });
 
-  return new HttpResponse(200, "Older messages deleted!", { data: result }).send(ctx);
+  return HttpResponse.success(ctx, HttpStatusCodes.OK, "Older messages deleted!", result);
 };
 
-export const translateMessage = async (ctx: Context) => {
-  const { message, language } = ctx.get("validated") as Translate;
+export const translateMessage: AppRouteHandler<TranslateMessageRoute> = async (ctx) => {
+  const { message, language } = ctx.req.valid("json");
 
   if (!message || !language) {
-    throw new HttpError(400, "Text message and language is required!");
+    return HttpResponse.error(ctx, HttpStatusCodes.BAD_REQUEST, "Required message and language!");
   }
 
   const result = await translate(message, null, language);
 
   if (!result) {
-    throw new HttpError(500, "Error while translating message!");
+    return HttpResponse.error(ctx, HttpStatusCodes.INTERNAL_SERVER_ERROR, "Error while translating message!");
   }
 
-  return new HttpResponse(200, "Text translated successfully!", { data: result.translation }).send(ctx);
+  return HttpResponse.success(ctx, HttpStatusCodes.OK, "Text translated successfully!", result.translation);
 };

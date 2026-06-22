@@ -1,17 +1,24 @@
-import type { Context } from "hono";
 import { Types } from "mongoose";
 import { imagekitDelete, imagekitUpload } from "#/configs/imagekit.js";
 import { Conversation, Group, User } from "#/models/index.js";
+import type { AppRouteHandler } from "#/openapi/index.js";
+import type {
+  CreateGroupRoute,
+  DeleteAvatarRoute,
+  FetchGroupRoute,
+  UpdateAvatarRoute,
+  UpdateDetailsRoute,
+  UpdateMembersRoute,
+} from "#/routes/group.js";
 import { emitEvent, getSockets } from "#/server.js";
-import { HttpError, HttpResponse } from "#/utilities/response.js";
-import type { CreateGroup, UpdateDetails, UpdateMembers } from "#/utilities/schema.js";
+import { HttpError, HttpResponse, HttpStatusCodes } from "#/utilities/http/index.js";
 
-export const createGroup = async (ctx: Context) => {
-  const groupData = ctx.get("validated") as CreateGroup;
+export const createGroup: AppRouteHandler<CreateGroupRoute> = async (ctx) => {
+  const groupData = ctx.req.valid("json");
   const reqUser = ctx.req.user?._id;
 
   if (groupData.admin !== reqUser?.toString()) {
-    throw new HttpError(400, "Invalid group admin assignment!");
+    return HttpResponse.error(ctx, HttpStatusCodes.FORBIDDEN, "Invalid group admin assignment!");
   }
 
   if (!groupData.members.includes(reqUser.toString())) {
@@ -26,11 +33,11 @@ export const createGroup = async (ctx: Context) => {
   ]);
 
   if (existingGroup) {
-    throw new HttpError(400, "You already have a group with this name!");
+    return HttpResponse.error(ctx, HttpStatusCodes.CONFLICT, "Group name already exists!");
   }
 
   if (existingUsers.length !== groupData.members.length) {
-    throw new HttpError(400, "One or more members are invalid users!");
+    return HttpResponse.error(ctx, HttpStatusCodes.BAD_REQUEST, "Some members don't exists!");
   }
 
   const newGroup = await Group.create({
@@ -40,7 +47,7 @@ export const createGroup = async (ctx: Context) => {
     members: groupData.members.map((id) => new Types.ObjectId(id)),
   });
 
-  const sockets = newGroup.members.flatMap((member) => getSockets(member.toString())).filter(Boolean);
+  const sockets = newGroup.members.flatMap((m) => getSockets(m.toString())).filter(Boolean);
 
   /** Notify to all members after group created */
   emitEvent(sockets, "group:created", {
@@ -53,12 +60,12 @@ export const createGroup = async (ctx: Context) => {
     models: "Group",
   });
 
-  return new HttpResponse(200, "Group created successfully!").send(ctx);
+  return HttpResponse.success(ctx, HttpStatusCodes.CREATED, "Group created successfully!");
 };
 
-export const updateDetails = async (ctx: Context) => {
-  const groupId = ctx.req.param("id");
-  const updateData = ctx.get("validated") as UpdateDetails;
+export const updateDetails: AppRouteHandler<UpdateDetailsRoute> = async (ctx) => {
+  const { id: groupId } = ctx.req.valid("param");
+  const updateData = ctx.req.valid("json");
   const reqUser = ctx.req.user?._id!;
 
   if (updateData.name) {
@@ -69,42 +76,38 @@ export const updateDetails = async (ctx: Context) => {
     });
 
     if (existingGroup) {
-      throw new HttpError(400, "You already have another group with this name!");
+      return HttpResponse.error(ctx, HttpStatusCodes.CONFLICT, "Group name already exists!");
     }
   }
 
-  const updatedGroup = await Group.findOneAndUpdate(
-    { _id: groupId!, admin: reqUser },
-    { $set: updateData },
-    { returnDocument: "after" },
-  );
+  const updatedGroup = await Group.findOneAndUpdate({ _id: groupId!, admin: reqUser }, { $set: updateData }, { returnDocument: "after" });
 
   if (!updatedGroup) {
-    throw new HttpError(404, "Group not found or you are not authorized!");
+    return HttpResponse.error(ctx, HttpStatusCodes.NOT_FOUND, "Group not found!");
   }
 
-  return new HttpResponse(200, "Group details updated successfully!", { data: updatedGroup }).send(ctx);
+  return HttpResponse.success(ctx, HttpStatusCodes.OK, "Group details updated successfully!", updatedGroup);
 };
 
 const toObjectIds = (ids: string[]) =>
   ids.map((id) => {
     if (!Types.ObjectId.isValid(id)) {
-      throw new HttpError(400, `Invalid ObjectId: ${id}`);
+      throw new HttpError(HttpStatusCodes.BAD_REQUEST, `Invalid ObjectId: ${id}`);
     }
     return new Types.ObjectId(id);
   });
 
-export const updateMembers = async (ctx: Context) => {
-  const groupId = ctx.req.param("id");
-  const { add, remove } = ctx.get("validated") as UpdateMembers;
+export const updateMembers: AppRouteHandler<UpdateMembersRoute> = async (ctx) => {
+  const { id: groupId } = ctx.req.valid("param");
+  const { add, remove } = ctx.req.valid("json");
   const reqUser = ctx.req.user?._id!;
 
   if (!add?.length && !remove?.length) {
-    throw new HttpError(400, "Provide at least one member to add or remove!");
+    return HttpResponse.error(ctx, HttpStatusCodes.BAD_REQUEST, "Provide at least one member!");
   }
 
   if (remove.includes(reqUser?.toString()!)) {
-    throw new HttpError(400, "Admin cannot be removed from the group!");
+    return HttpResponse.error(ctx, HttpStatusCodes.FORBIDDEN, "Admin can't be removed!");
   }
 
   const addIds = toObjectIds(add);
@@ -115,7 +118,7 @@ export const updateMembers = async (ctx: Context) => {
   const missingUsers = memberIds.filter((id) => !existingUsers.has(id));
 
   if (missingUsers.length > 0) {
-    throw new HttpError(404, `Users not found: ${missingUsers.join(", ")}`);
+    return HttpResponse.error(ctx, HttpStatusCodes.BAD_REQUEST, `Users not found: ${missingUsers.join(", ")}`);
   }
 
   const updatedGroup = await Group.findOneAndUpdate(
@@ -138,33 +141,30 @@ export const updateMembers = async (ctx: Context) => {
   );
 
   if (!updatedGroup) {
-    throw new HttpError(404, "Group not found or you are not authorized!");
+    return HttpResponse.error(ctx, HttpStatusCodes.NOT_FOUND, "Group not found!");
   }
 
-  return new HttpResponse(200, "Group members updated successfully!", { data: updatedGroup }).send(ctx);
+  return HttpResponse.success(ctx, HttpStatusCodes.OK, "Group members updated successfully!", updatedGroup);
 };
 
-export const updateAvatar = async (ctx: Context) => {
-  const groupId = ctx.req.param("id");
-  const reqUser = ctx.req.user?._id!;
-
-  const dataBody = await ctx.req.parseBody();
-  const imageFile = dataBody["group-avatar"];
+export const updateAvatar: AppRouteHandler<UpdateAvatarRoute> = async (ctx) => {
+  const { id: groupId } = ctx.req.valid("param");
+  const { "group-avatar": imageFile } = ctx.req.valid("form");
 
   if (!imageFile || !(imageFile instanceof File)) {
-    throw new HttpError(400, "Invalid group avatar file upload!");
+    return HttpResponse.error(ctx, HttpStatusCodes.BAD_REQUEST, "Invalid avatar file upload!");
   }
 
-  const currentGroup = await Group.findOne({ _id: groupId!, admin: reqUser });
+  const currentGroup = await Group.findOne({ _id: groupId!, admin: ctx.req.user?._id! });
 
   if (!currentGroup) {
-    throw new HttpError(403, "You're not allowed for update this group!");
+    return HttpResponse.error(ctx, HttpStatusCodes.NOT_FOUND, "Group not found!");
   }
 
   const uploadedImage = await imagekitUpload(imageFile);
 
   if (!uploadedImage?.url) {
-    throw new HttpError(500, "Error while uploading group avatar!");
+    return HttpResponse.error(ctx, HttpStatusCodes.INTERNAL_SERVER_ERROR, "Error while uploading avatar!");
   }
 
   if (currentGroup.avatar) {
@@ -172,44 +172,43 @@ export const updateAvatar = async (ctx: Context) => {
     const fileId = imageUrl.searchParams.get("fid");
 
     if (fileId) {
-      await imagekitDelete(fileId);
+      imagekitDelete(fileId).catch(() => {});
     }
   }
 
   currentGroup.avatar = `${uploadedImage.url}?fid=${uploadedImage.fileId}`;
   await currentGroup.save({ validateBeforeSave: false });
 
-  return new HttpResponse(200, "Group avatar updated successfully!", { data: currentGroup }).send(ctx);
+  return HttpResponse.success(ctx, HttpStatusCodes.OK, "Group avatar updated successfully!", currentGroup);
 };
 
-export const deleteAvatar = async (ctx: Context) => {
-  const groupId = ctx.req.param("id");
-  const reqUser = ctx.req.user?._id!;
+export const deleteAvatar: AppRouteHandler<DeleteAvatarRoute> = async (ctx) => {
+  const { id: groupId } = ctx.req.valid("param");
 
-  const currentGroup = await Group.findOne({ _id: groupId!, admin: reqUser });
+  const currentGroup = await Group.findOne({ _id: groupId!, admin: ctx.req.user?._id! });
 
   if (!currentGroup) {
-    throw new HttpError(403, "You're not allowed for update this group!");
+    return HttpResponse.error(ctx, HttpStatusCodes.NOT_FOUND, "Group not found!");
   }
 
   if (!currentGroup.avatar) {
-    throw new HttpError(400, "Group avatar is not available!");
+    return HttpResponse.error(ctx, HttpStatusCodes.BAD_REQUEST, "Group avatar not available!");
   }
 
   const imageUrl = new URL(currentGroup.avatar);
   const fileId = imageUrl.searchParams.get("fid");
 
   if (fileId) {
-    await imagekitDelete(fileId);
+    imagekitDelete(fileId).catch(() => {});
   }
 
   currentGroup.avatar = null;
   await currentGroup.save({ validateBeforeSave: false });
 
-  return new HttpResponse(200, "Group avatar deleted successfully!", { data: currentGroup }).send(ctx);
+  return HttpResponse.success(ctx, HttpStatusCodes.OK, "Group avatar deleted successfully!", currentGroup);
 };
 
-export const fetchGroups = async (ctx: Context) => {
+export const fetchGroups: AppRouteHandler<FetchGroupRoute> = async (ctx) => {
   const uid = new Types.ObjectId(ctx.req.user?._id);
 
   const groups = await Group.aggregate([
@@ -242,7 +241,7 @@ export const fetchGroups = async (ctx: Context) => {
     },
   ]);
 
-  return new HttpResponse(200, "Groups fetched successfully!", { data: groups }).send(ctx);
+  return HttpResponse.success(ctx, HttpStatusCodes.OK, "Groups fetched successfully!", groups);
 };
 
 export const fetchMembers = async (gid: Types.ObjectId) => {
