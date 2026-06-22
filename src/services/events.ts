@@ -1,5 +1,7 @@
+import { createRoute, z } from "@hono/zod-openapi";
 import type { Context } from "hono";
 import { logger } from "#/middlewares/index.js";
+import { HttpPhrases, HttpStatus } from "#/utilities/http/index.js";
 
 type EventsClient = {
   controller: ReadableStreamDefaultController<string>;
@@ -32,12 +34,12 @@ class EventsService {
 
 export const eventsService = new EventsService();
 
-export const connectEvents = (ctx: Context) => {
-  const uid = ctx.req.user?._id.toString();
+export const connectEvents = <C extends Context>(ctx: C) => {
+  const uid = ctx.var.user._id.toString();
 
   if (!uid) {
     logger.info("Event user not authenticated!");
-    return ctx.text("Unauthorized events request!", 401);
+    return ctx.text("Unauthorized request!", HttpStatus.UNAUTHORIZED);
   }
 
   const stream = new ReadableStream<string>({
@@ -68,3 +70,19 @@ export const connectEvents = (ctx: Context) => {
     },
   });
 };
+
+export const eventsRoute = createRoute({
+  tags: ["Events"],
+  method: "get",
+  path: "/events",
+  responses: {
+    [HttpStatus.UNAUTHORIZED]: {
+      content: { "text/plain": { schema: z.string() } },
+      description: HttpPhrases.UNAUTHORIZED,
+    },
+    [HttpStatus.OK]: {
+      content: { "text/event-stream": { schema: z.string() } },
+      description: HttpPhrases.OK,
+    },
+  },
+});

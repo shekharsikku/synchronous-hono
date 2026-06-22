@@ -7,12 +7,20 @@ import {
   getMessages,
   reactMessage,
   sendMessage,
-  translateMessage,
 } from "#/controllers/message.js";
 import { authAccess, limiter } from "#/middlewares/index.js";
-import { createRouter, errorSchema, jsonContent, jsonRequired, pathParams, queryParams, successSchema, Tags } from "#/openapi/index.js";
-import { HttpStatusCodes, HttpStatusPhrases } from "#/utilities/http/index.js";
-import { messageSchema, translateSchema } from "#/utilities/schema.js";
+import {
+  createRouter,
+  errorSchema,
+  jsonContent,
+  jsonRequired,
+  pathParams,
+  queryParams,
+  successSchema,
+  Tags,
+} from "#/openapi/index.js";
+import { HttpPhrases, HttpStatus } from "#/utilities/http/index.js";
+import { messageSchema } from "#/utilities/schema.js";
 
 const sendMessageRoute = createRoute({
   tags: Tags.Message,
@@ -26,8 +34,14 @@ const sendMessageRoute = createRoute({
     body: jsonRequired(messageSchema, "Message payload!"),
   },
   responses: {
-    [HttpStatusCodes.UNAUTHORIZED]: jsonContent(errorSchema({ message: "Unauthorized request!" }), HttpStatusPhrases.UNAUTHORIZED),
-    [HttpStatusCodes.CREATED]: jsonContent(successSchema({ message: "Message sent successfully!", data: {} }), HttpStatusPhrases.CREATED),
+    [HttpStatus.UNAUTHORIZED]: jsonContent(
+      errorSchema({ message: "Unauthorized request!" }),
+      HttpPhrases.UNAUTHORIZED,
+    ),
+    [HttpStatus.CREATED]: jsonContent(
+      successSchema({ message: "Message sent successfully!", data: {} }),
+      HttpPhrases.CREATED,
+    ),
   },
 });
 
@@ -42,8 +56,14 @@ const getMessageRoute = createRoute({
     }),
   },
   responses: {
-    [HttpStatusCodes.UNAUTHORIZED]: jsonContent(errorSchema({ message: "Unauthorized request!" }), HttpStatusPhrases.UNAUTHORIZED),
-    [HttpStatusCodes.OK]: jsonContent(successSchema({ message: "Message fetched successfully!", data: [] }), HttpStatusPhrases.OK),
+    [HttpStatus.UNAUTHORIZED]: jsonContent(
+      errorSchema({ message: "Unauthorized request!" }),
+      HttpPhrases.UNAUTHORIZED,
+    ),
+    [HttpStatus.OK]: jsonContent(
+      successSchema({ message: "Message fetched successfully!", data: [] }),
+      HttpPhrases.OK,
+    ),
   },
 });
 
@@ -60,8 +80,14 @@ const fetchMessageRoute = createRoute({
     }),
   },
   responses: {
-    [HttpStatusCodes.UNAUTHORIZED]: jsonContent(errorSchema({ message: "Unauthorized request!" }), HttpStatusPhrases.UNAUTHORIZED),
-    [HttpStatusCodes.OK]: jsonContent(successSchema({ message: "Message fetched successfully!", data: [] }), HttpStatusPhrases.OK),
+    [HttpStatus.UNAUTHORIZED]: jsonContent(
+      errorSchema({ message: "Unauthorized request!" }),
+      HttpPhrases.UNAUTHORIZED,
+    ),
+    [HttpStatus.OK]: jsonContent(
+      successSchema({ message: "Message fetched successfully!", data: [] }),
+      HttpPhrases.OK,
+    ),
   },
 });
 
@@ -79,23 +105,41 @@ const editMessageRoute = createRoute({
     ),
   },
   responses: {
-    [HttpStatusCodes.UNAUTHORIZED]: jsonContent(errorSchema({ message: "Unauthorized request!" }), HttpStatusPhrases.UNAUTHORIZED),
-    [HttpStatusCodes.BAD_REQUEST]: jsonContent(errorSchema({ message: "You can't edit this message!" }), HttpStatusPhrases.BAD_REQUEST),
-    [HttpStatusCodes.OK]: jsonContent(successSchema({ message: "Message edited successfully!" }), HttpStatusPhrases.OK),
+    [HttpStatus.UNAUTHORIZED]: jsonContent(
+      errorSchema({ message: "Unauthorized request!" }),
+      HttpPhrases.UNAUTHORIZED,
+    ),
+    [HttpStatus.BAD_REQUEST]: jsonContent(
+      errorSchema({ message: "You can't edit this message!" }),
+      HttpPhrases.BAD_REQUEST,
+    ),
+    [HttpStatus.OK]: jsonContent(
+      successSchema({ message: "Message edited successfully!" }),
+      HttpPhrases.OK,
+    ),
   },
 });
 
 const deleteMessageRoute = createRoute({
   tags: Tags.Message,
-  method: "patch",
+  method: "delete",
   path: "/delete/{id}",
   request: {
     params: pathParams("id"),
   },
   responses: {
-    [HttpStatusCodes.UNAUTHORIZED]: jsonContent(errorSchema({ message: "Unauthorized request!" }), HttpStatusPhrases.UNAUTHORIZED),
-    [HttpStatusCodes.BAD_REQUEST]: jsonContent(errorSchema({ message: "You can't delete this message!" }), HttpStatusPhrases.BAD_REQUEST),
-    [HttpStatusCodes.OK]: jsonContent(successSchema({ message: "Message deleted successfully!" }), HttpStatusPhrases.OK),
+    [HttpStatus.UNAUTHORIZED]: jsonContent(
+      errorSchema({ message: "Unauthorized request!" }),
+      HttpPhrases.UNAUTHORIZED,
+    ),
+    [HttpStatus.BAD_REQUEST]: jsonContent(
+      errorSchema({ message: "You can't delete this message!" }),
+      HttpPhrases.BAD_REQUEST,
+    ),
+    [HttpStatus.OK]: jsonContent(
+      successSchema({ message: "Message deleted successfully!" }),
+      HttpPhrases.OK,
+    ),
   },
 });
 
@@ -113,9 +157,18 @@ const reactMessageRoute = createRoute({
     ),
   },
   responses: {
-    [HttpStatusCodes.UNAUTHORIZED]: jsonContent(errorSchema({ message: "Unauthorized request!" }), HttpStatusPhrases.UNAUTHORIZED),
-    [HttpStatusCodes.BAD_REQUEST]: jsonContent(errorSchema({ message: "Unable to react this message!" }), HttpStatusPhrases.BAD_REQUEST),
-    [HttpStatusCodes.OK]: jsonContent(successSchema({ message: "Message reacted successfully!" }), HttpStatusPhrases.OK),
+    [HttpStatus.UNAUTHORIZED]: jsonContent(
+      errorSchema({ message: "Unauthorized request!" }),
+      HttpPhrases.UNAUTHORIZED,
+    ),
+    [HttpStatus.BAD_REQUEST]: jsonContent(
+      errorSchema({ message: "Unable to react this message!" }),
+      HttpPhrases.BAD_REQUEST,
+    ),
+    [HttpStatus.OK]: jsonContent(
+      successSchema({ message: "Message reacted successfully!" }),
+      HttpPhrases.OK,
+    ),
   },
 });
 
@@ -129,25 +182,14 @@ const deleteMessagesRoute = createRoute({
     }),
   },
   responses: {
-    [HttpStatusCodes.UNAUTHORIZED]: jsonContent(errorSchema({ message: "Unauthorized request!" }), HttpStatusPhrases.UNAUTHORIZED),
-    [HttpStatusCodes.OK]: jsonContent(successSchema({ message: "Message reacted successfully!" }), HttpStatusPhrases.OK),
-  },
-});
-
-const translateMessageRoute = createRoute({
-  tags: Tags.Message,
-  method: "post",
-  path: "/translate",
-  request: {
-    body: jsonRequired(translateSchema, "Translate message payload!"),
-  },
-  responses: {
-    [HttpStatusCodes.BAD_REQUEST]: jsonContent(errorSchema({ message: "Required message and language!" }), HttpStatusPhrases.BAD_REQUEST),
-    [HttpStatusCodes.INTERNAL_SERVER_ERROR]: jsonContent(
-      errorSchema({ message: "Error while translating message!" }),
-      HttpStatusPhrases.INTERNAL_SERVER_ERROR,
+    [HttpStatus.UNAUTHORIZED]: jsonContent(
+      errorSchema({ message: "Unauthorized request!" }),
+      HttpPhrases.UNAUTHORIZED,
     ),
-    [HttpStatusCodes.OK]: jsonContent(successSchema({ message: "Text translated successfully!" }), HttpStatusPhrases.OK),
+    [HttpStatus.OK]: jsonContent(
+      successSchema({ message: "Message reacted successfully!" }),
+      HttpPhrases.OK,
+    ),
   },
 });
 
@@ -162,7 +204,6 @@ messageRouter.openapi(editMessageRoute, editMessage);
 messageRouter.openapi(deleteMessageRoute, deleteMessage);
 messageRouter.openapi(reactMessageRoute, reactMessage);
 messageRouter.openapi(deleteMessagesRoute, deleteMessages);
-messageRouter.openapi(translateMessageRoute, translateMessage);
 
 export type SendMessageRoute = typeof sendMessageRoute;
 export type GetMessageRoute = typeof getMessageRoute;
@@ -171,6 +212,5 @@ export type EditMessageRoute = typeof editMessageRoute;
 export type DeleteMessageRoute = typeof deleteMessageRoute;
 export type ReactMessageRoute = typeof reactMessageRoute;
 export type DeleteMessagesRoute = typeof deleteMessagesRoute;
-export type TranslateMessageRoute = typeof translateMessageRoute;
 
 export default messageRouter;

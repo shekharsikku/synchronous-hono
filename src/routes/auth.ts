@@ -1,8 +1,15 @@
 import { createRoute } from "@hono/zod-openapi";
 import { authRefresh, signInUser, signOutUser, signUpUser } from "#/controllers/auth.js";
 import { limiter } from "#/middlewares/index.js";
-import { createRouter, errorSchema, jsonContent, jsonRequired, successSchema, Tags } from "#/openapi/index.js";
-import { HttpStatusCodes, HttpStatusPhrases } from "#/utilities/http/index.js";
+import {
+  createRouter,
+  errorSchema,
+  jsonContent,
+  jsonRequired,
+  successSchema,
+  Tags,
+} from "#/openapi/index.js";
+import { HttpPhrases, HttpStatus } from "#/utilities/http/index.js";
 import { signInSchema, signUpSchema } from "#/utilities/schema.js";
 
 const signUpRoute = createRoute({
@@ -13,8 +20,14 @@ const signUpRoute = createRoute({
     body: jsonRequired(signUpSchema, "Sign up payload!"),
   },
   responses: {
-    [HttpStatusCodes.CONFLICT]: jsonContent(errorSchema({ message: "Email already exists!" }), HttpStatusPhrases.CONFLICT),
-    [HttpStatusCodes.CREATED]: jsonContent(successSchema({ message: "Signed up successfully!" }), HttpStatusPhrases.CREATED),
+    [HttpStatus.CONFLICT]: jsonContent(
+      errorSchema({ message: "Email already exists!" }),
+      HttpPhrases.CONFLICT,
+    ),
+    [HttpStatus.CREATED]: jsonContent(
+      successSchema({ message: "Signed up successfully!" }),
+      HttpPhrases.CREATED,
+    ),
   },
 });
 
@@ -26,9 +39,18 @@ const signInRoute = createRoute({
     body: jsonRequired(signInSchema, "Sign in payload!"),
   },
   responses: {
-    [HttpStatusCodes.BAD_REQUEST]: jsonContent(errorSchema({ message: "Required email or username!" }), HttpStatusPhrases.BAD_REQUEST),
-    [HttpStatusCodes.UNAUTHORIZED]: jsonContent(errorSchema({ message: "Invalid credentials!" }), HttpStatusPhrases.UNAUTHORIZED),
-    [HttpStatusCodes.OK]: jsonContent(successSchema({ message: "Signed in successfully!" }), HttpStatusPhrases.OK),
+    [HttpStatus.BAD_REQUEST]: jsonContent(
+      errorSchema({ message: "Required email or username!" }),
+      HttpPhrases.BAD_REQUEST,
+    ),
+    [HttpStatus.UNAUTHORIZED]: jsonContent(
+      errorSchema({ message: "Invalid credentials!" }),
+      HttpPhrases.UNAUTHORIZED,
+    ),
+    [HttpStatus.OK]: jsonContent(
+      successSchema({ message: "Signed in successfully!" }),
+      HttpPhrases.OK,
+    ),
   },
 });
 
@@ -37,7 +59,10 @@ const signOutRoute = createRoute({
   method: "delete",
   path: "/sign-out",
   responses: {
-    [HttpStatusCodes.OK]: jsonContent(successSchema({ message: "Signed out successfully!" }), HttpStatusPhrases.OK),
+    [HttpStatus.OK]: jsonContent(
+      successSchema({ message: "Signed out successfully!" }),
+      HttpPhrases.OK,
+    ),
   },
 });
 
@@ -46,8 +71,14 @@ const refreshRoute = createRoute({
   method: "get",
   path: "/auth-refresh",
   responses: {
-    [HttpStatusCodes.UNAUTHORIZED]: jsonContent(errorSchema({ message: "Unauthorized request!" }), HttpStatusPhrases.UNAUTHORIZED),
-    [HttpStatusCodes.OK]: jsonContent(successSchema({ message: "Refreshed successfully!" }), HttpStatusPhrases.OK),
+    [HttpStatus.UNAUTHORIZED]: jsonContent(
+      errorSchema({ message: "Unauthorized request!" }),
+      HttpPhrases.UNAUTHORIZED,
+    ),
+    [HttpStatus.OK]: jsonContent(
+      successSchema({ message: "Refreshed successfully!" }),
+      HttpPhrases.OK,
+    ),
   },
 });
 

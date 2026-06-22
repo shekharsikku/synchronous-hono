@@ -1,8 +1,22 @@
 import { createRoute } from "@hono/zod-openapi";
-import { changePassword, deleteImage, profileSetup, updateImage, userInformation } from "#/controllers/user.js";
+import {
+  changePassword,
+  deleteImage,
+  profileSetup,
+  updateImage,
+  userInformation,
+} from "#/controllers/user.js";
 import { authAccess, limiter } from "#/middlewares/index.js";
-import { createRouter, errorSchema, jsonContent, jsonRequired, multipartRequired, successSchema, Tags } from "#/openapi/index.js";
-import { HttpStatusCodes, HttpStatusPhrases } from "#/utilities/http/index.js";
+import {
+  createRouter,
+  errorSchema,
+  jsonContent,
+  jsonRequired,
+  multipartRequired,
+  successSchema,
+  Tags,
+} from "#/openapi/index.js";
+import { HttpPhrases, HttpStatus } from "#/utilities/http/index.js";
 import { passwordSchema, profileSchema } from "#/utilities/schema.js";
 
 const profileSetupRoute = createRoute({
@@ -13,9 +27,18 @@ const profileSetupRoute = createRoute({
     body: jsonRequired(profileSchema, "Profile payload!"),
   },
   responses: {
-    [HttpStatusCodes.UNAUTHORIZED]: jsonContent(errorSchema({ message: "Unauthorized request!" }), HttpStatusPhrases.UNAUTHORIZED),
-    [HttpStatusCodes.CONFLICT]: jsonContent(errorSchema({ message: "Username already exists!" }), HttpStatusPhrases.CONFLICT),
-    [HttpStatusCodes.OK]: jsonContent(successSchema({ message: "Profile updated successfully!" }), HttpStatusPhrases.OK),
+    [HttpStatus.UNAUTHORIZED]: jsonContent(
+      errorSchema({ message: "Unauthorized request!" }),
+      HttpPhrases.UNAUTHORIZED,
+    ),
+    [HttpStatus.CONFLICT]: jsonContent(
+      errorSchema({ message: "Username already exists!" }),
+      HttpPhrases.CONFLICT,
+    ),
+    [HttpStatus.OK]: jsonContent(
+      successSchema({ message: "Profile updated successfully!" }),
+      HttpPhrases.OK,
+    ),
   },
 });
 
@@ -27,13 +50,22 @@ const updateImageRoute = createRoute({
     body: multipartRequired("profile-image", "Image file for upload!"),
   },
   responses: {
-    [HttpStatusCodes.BAD_REQUEST]: jsonContent(errorSchema({ message: "Invalid image file upload!" }), HttpStatusPhrases.BAD_REQUEST),
-    [HttpStatusCodes.UNAUTHORIZED]: jsonContent(errorSchema({ message: "Unauthorized request!" }), HttpStatusPhrases.UNAUTHORIZED),
-    [HttpStatusCodes.INTERNAL_SERVER_ERROR]: jsonContent(
-      errorSchema({ message: "Error while uploading image!" }),
-      HttpStatusPhrases.INTERNAL_SERVER_ERROR,
+    [HttpStatus.BAD_REQUEST]: jsonContent(
+      errorSchema({ message: "Invalid image file upload!" }),
+      HttpPhrases.BAD_REQUEST,
     ),
-    [HttpStatusCodes.OK]: jsonContent(successSchema({ message: "Image updated successfully!" }), HttpStatusPhrases.OK),
+    [HttpStatus.UNAUTHORIZED]: jsonContent(
+      errorSchema({ message: "Unauthorized request!" }),
+      HttpPhrases.UNAUTHORIZED,
+    ),
+    [HttpStatus.INTERNAL_SERVER_ERROR]: jsonContent(
+      errorSchema({ message: "Error while uploading image!" }),
+      HttpPhrases.INTERNAL_SERVER_ERROR,
+    ),
+    [HttpStatus.OK]: jsonContent(
+      successSchema({ message: "Image updated successfully!" }),
+      HttpPhrases.OK,
+    ),
   },
 });
 
@@ -42,9 +74,18 @@ const deleteImageRoute = createRoute({
   method: "delete",
   path: "/profile-image",
   responses: {
-    [HttpStatusCodes.UNAUTHORIZED]: jsonContent(errorSchema({ message: "Unauthorized request!" }), HttpStatusPhrases.UNAUTHORIZED),
-    [HttpStatusCodes.NOT_FOUND]: jsonContent(errorSchema({ message: "Image not available!" }), HttpStatusPhrases.NOT_FOUND),
-    [HttpStatusCodes.OK]: jsonContent(successSchema({ message: "Image deleted successfully!" }), HttpStatusPhrases.OK),
+    [HttpStatus.UNAUTHORIZED]: jsonContent(
+      errorSchema({ message: "Unauthorized request!" }),
+      HttpPhrases.UNAUTHORIZED,
+    ),
+    [HttpStatus.NOT_FOUND]: jsonContent(
+      errorSchema({ message: "Image not available!" }),
+      HttpPhrases.NOT_FOUND,
+    ),
+    [HttpStatus.OK]: jsonContent(
+      successSchema({ message: "Image deleted successfully!" }),
+      HttpPhrases.OK,
+    ),
   },
 });
 
@@ -56,10 +97,22 @@ const changePasswordRoute = createRoute({
     body: jsonRequired(passwordSchema, "Password payload!"),
   },
   responses: {
-    [HttpStatusCodes.BAD_REQUEST]: jsonContent(errorSchema({ message: "New password must be different!" }), HttpStatusPhrases.BAD_REQUEST),
-    [HttpStatusCodes.UNAUTHORIZED]: jsonContent(errorSchema({ message: "Unauthorized request!" }), HttpStatusPhrases.UNAUTHORIZED),
-    [HttpStatusCodes.FORBIDDEN]: jsonContent(errorSchema({ message: "Incorrect old password!" }), HttpStatusPhrases.FORBIDDEN),
-    [HttpStatusCodes.OK]: jsonContent(successSchema({ message: "Password changed successfully!" }), HttpStatusPhrases.OK),
+    [HttpStatus.BAD_REQUEST]: jsonContent(
+      errorSchema({ message: "New password must be different!" }),
+      HttpPhrases.BAD_REQUEST,
+    ),
+    [HttpStatus.UNAUTHORIZED]: jsonContent(
+      errorSchema({ message: "Unauthorized request!" }),
+      HttpPhrases.UNAUTHORIZED,
+    ),
+    [HttpStatus.FORBIDDEN]: jsonContent(
+      errorSchema({ message: "Incorrect old password!" }),
+      HttpPhrases.FORBIDDEN,
+    ),
+    [HttpStatus.OK]: jsonContent(
+      successSchema({ message: "Password changed successfully!" }),
+      HttpPhrases.OK,
+    ),
   },
 });
 
@@ -68,8 +121,11 @@ const userInformationRoute = createRoute({
   method: "get",
   path: "/user-information",
   responses: {
-    [HttpStatusCodes.UNAUTHORIZED]: jsonContent(errorSchema({ message: "Unauthorized request!" }), HttpStatusPhrases.UNAUTHORIZED),
-    [HttpStatusCodes.OK]: jsonContent(successSchema({ message: "User information!" }), HttpStatusPhrases.OK),
+    [HttpStatus.UNAUTHORIZED]: jsonContent(
+      errorSchema({ message: "Unauthorized request!" }),
+      HttpPhrases.UNAUTHORIZED,
+    ),
+    [HttpStatus.OK]: jsonContent(successSchema({ message: "User information!" }), HttpPhrases.OK),
   },
 });
 

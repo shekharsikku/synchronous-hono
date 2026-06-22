@@ -1,8 +1,21 @@
 import { createRoute, z } from "@hono/zod-openapi";
-import { availableContact, fetchContact, fetchContacts, searchContact } from "#/controllers/contact.js";
+import {
+  availableContact,
+  fetchContact,
+  fetchContacts,
+  searchContact,
+} from "#/controllers/contact.js";
 import { authAccess, limiter } from "#/middlewares/index.js";
-import { createRouter, errorSchema, jsonContent, pathParams, queryParams, successSchema, Tags } from "#/openapi/index.js";
-import { HttpStatusCodes, HttpStatusPhrases } from "#/utilities/http/index.js";
+import {
+  createRouter,
+  errorSchema,
+  jsonContent,
+  pathParams,
+  queryParams,
+  successSchema,
+  Tags,
+} from "#/openapi/index.js";
+import { HttpPhrases, HttpStatus } from "#/utilities/http/index.js";
 
 const searchContactRoute = createRoute({
   tags: Tags.Contact,
@@ -14,9 +27,18 @@ const searchContactRoute = createRoute({
     }),
   },
   responses: {
-    [HttpStatusCodes.BAD_REQUEST]: jsonContent(errorSchema({ message: "Search query can't empty!" }), HttpStatusPhrases.BAD_REQUEST),
-    [HttpStatusCodes.UNAUTHORIZED]: jsonContent(errorSchema({ message: "Unauthorized request!" }), HttpStatusPhrases.UNAUTHORIZED),
-    [HttpStatusCodes.OK]: jsonContent(successSchema({ message: "Contacts searched successfully!", data: [] }), HttpStatusPhrases.OK),
+    [HttpStatus.BAD_REQUEST]: jsonContent(
+      errorSchema({ message: "Search query can't empty!" }),
+      HttpPhrases.BAD_REQUEST,
+    ),
+    [HttpStatus.UNAUTHORIZED]: jsonContent(
+      errorSchema({ message: "Unauthorized request!" }),
+      HttpPhrases.UNAUTHORIZED,
+    ),
+    [HttpStatus.OK]: jsonContent(
+      successSchema({ message: "Contacts searched successfully!", data: [] }),
+      HttpPhrases.OK,
+    ),
   },
 });
 
@@ -26,8 +48,14 @@ const availableContactRoute = createRoute({
   path: "/available",
   request: {},
   responses: {
-    [HttpStatusCodes.UNAUTHORIZED]: jsonContent(errorSchema({ message: "Unauthorized request!" }), HttpStatusPhrases.UNAUTHORIZED),
-    [HttpStatusCodes.OK]: jsonContent(successSchema({ message: "Contacts fetched successfully!", data: [] }), HttpStatusPhrases.OK),
+    [HttpStatus.UNAUTHORIZED]: jsonContent(
+      errorSchema({ message: "Unauthorized request!" }),
+      HttpPhrases.UNAUTHORIZED,
+    ),
+    [HttpStatus.OK]: jsonContent(
+      successSchema({ message: "Contacts fetched successfully!", data: [] }),
+      HttpPhrases.OK,
+    ),
   },
 });
 
@@ -36,8 +64,14 @@ const fetchContactsRoute = createRoute({
   method: "get",
   path: "/fetch",
   responses: {
-    [HttpStatusCodes.UNAUTHORIZED]: jsonContent(errorSchema({ message: "Unauthorized request!" }), HttpStatusPhrases.UNAUTHORIZED),
-    [HttpStatusCodes.OK]: jsonContent(successSchema({ message: "Contacts fetched successfully!", data: [] }), HttpStatusPhrases.OK),
+    [HttpStatus.UNAUTHORIZED]: jsonContent(
+      errorSchema({ message: "Unauthorized request!" }),
+      HttpPhrases.UNAUTHORIZED,
+    ),
+    [HttpStatus.OK]: jsonContent(
+      successSchema({ message: "Contacts fetched successfully!", data: [] }),
+      HttpPhrases.OK,
+    ),
   },
 });
 
@@ -49,9 +83,18 @@ const fetchContactRoute = createRoute({
     params: pathParams("id"),
   },
   responses: {
-    [HttpStatusCodes.UNAUTHORIZED]: jsonContent(errorSchema({ message: "Unauthorized request!" }), HttpStatusPhrases.UNAUTHORIZED),
-    [HttpStatusCodes.NOT_FOUND]: jsonContent(errorSchema({ message: "Contact not found!" }), HttpStatusPhrases.NOT_FOUND),
-    [HttpStatusCodes.OK]: jsonContent(successSchema({ message: "Contact fetched successfully!", data: {} }), HttpStatusPhrases.OK),
+    [HttpStatus.UNAUTHORIZED]: jsonContent(
+      errorSchema({ message: "Unauthorized request!" }),
+      HttpPhrases.UNAUTHORIZED,
+    ),
+    [HttpStatus.NOT_FOUND]: jsonContent(
+      errorSchema({ message: "Contact not found!" }),
+      HttpPhrases.NOT_FOUND,
+    ),
+    [HttpStatus.OK]: jsonContent(
+      successSchema({ message: "Contact fetched successfully!", data: {} }),
+      HttpPhrases.OK,
+    ),
   },
 });
 

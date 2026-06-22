@@ -1,4 +1,3 @@
-import { Hono } from "hono";
 import { bodyLimit } from "hono/body-limit";
 import { cors } from "hono/cors";
 import { requestId } from "hono/request-id";
@@ -7,12 +6,13 @@ import webpush from "web-push";
 import { ZodError } from "zod";
 import env from "#/configs/env.js";
 import { logger } from "#/middlewares/index.js";
+import { configOpenAPI, createRouter } from "#/openapi/index.js";
 import routes from "#/routes/index.js";
-import { HttpError, HttpResponse } from "#/utilities/response.js";
+import { HttpError, HttpResponse, HttpStatus } from "#/utilities/http/index.js";
 
 webpush.setVapidDetails(env.VAPID_MAILTO, env.VAPID_PUBLIC_KEY, env.VAPID_PRIVATE_KEY);
 
-const app = new Hono({ strict: env.isProd });
+const app = createRouter();
 
 app.use(requestId());
 app.use(pinoLogger({ pino: logger }));
@@ -28,40 +28,42 @@ app.use(
 app.use(
   bodyLimit({
     maxSize: env.BODY_LIMIT * 1024 * 1024,
-    onError: () => {
-      throw new HttpError(413, "Request payload is too large!");
+    onError: (ctx) => {
+      return HttpResponse.error(ctx, HttpStatus.REQUEST_TOO_LONG, "Request payload is too large!");
     },
   }),
 );
 
 app.all("/", (ctx) => {
-  return ctx.redirect(env.CORS_ORIGIN);
+  if (env.isProd) return ctx.redirect(env.CORS_ORIGIN);
+  return HttpResponse.success(ctx, HttpStatus.OK, "Bun + Hono says hello!");
 });
 
-app.get("/hello", (ctx) => {
-  const to = ctx.req.query("to") ?? "Unknown";
-  const ts = new Date().toISOString();
-  return new HttpResponse(200, `Bun + Hono says hello to ${to} at ${ts}!`).send(ctx);
-});
+configOpenAPI(app);
 
 app.route("/api", routes);
 
 app.onError((err, ctx) => {
-  if (err instanceof ZodError) {
-    return new HttpResponse(400, "Validation error occurred!", { error: err.issues }).send(ctx);
+  if (err instanceof HttpError) {
+    return HttpResponse.error(ctx, err.status, err.message);
   }
 
-  if (err instanceof HttpError) {
-    return new HttpResponse(err.code, err.message).send(ctx);
+  if (err instanceof ZodError) {
+    return HttpResponse.error(
+      ctx,
+      HttpStatus.UNPROCESSABLE_ENTITY,
+      "Validation error occurred!",
+      err.issues,
+    );
   }
 
   ctx.var.logger.error({ err }, "Unhandled server error!");
-  return new HttpResponse(500, "Internal server error!").send(ctx);
+  return HttpResponse.error(ctx, HttpStatus.INTERNAL_SERVER_ERROR, "Internal server error!");
 });
 
 app.notFound((ctx) => {
   const message = `Requested url '${ctx.req.path}' not found on the server!`;
-  return new HttpResponse(404, message).send(ctx);
+  return HttpResponse.error(ctx, HttpStatus.NOT_FOUND, message);
 });
 
 export default app;

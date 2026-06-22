@@ -1,5 +1,12 @@
 import { createRoute } from "@hono/zod-openapi";
-import { createGroup, deleteAvatar, fetchGroups, updateAvatar, updateDetails, updateMembers } from "#/controllers/group.js";
+import {
+  createGroup,
+  deleteAvatar,
+  fetchGroups,
+  updateAvatar,
+  updateDetails,
+  updateMembers,
+} from "#/controllers/group.js";
 import { authAccess, limiter } from "#/middlewares/index.js";
 import {
   createRouter,
@@ -11,7 +18,7 @@ import {
   successSchema,
   Tags,
 } from "#/openapi/index.js";
-import { HttpStatusCodes, HttpStatusPhrases } from "#/utilities/http/index.js";
+import { HttpPhrases, HttpStatus } from "#/utilities/http/index.js";
 import { createGroupSchema, updateDetailsSchema, updateMembersSchema } from "#/utilities/schema.js";
 
 const createGroupRoute = createRoute({
@@ -22,11 +29,26 @@ const createGroupRoute = createRoute({
     body: jsonRequired(createGroupSchema, "Group create payload!"),
   },
   responses: {
-    [HttpStatusCodes.UNAUTHORIZED]: jsonContent(errorSchema({ message: "Unauthorized request!" }), HttpStatusPhrases.UNAUTHORIZED),
-    [HttpStatusCodes.FORBIDDEN]: jsonContent(errorSchema({ message: "Invalid group admin assignment!" }), HttpStatusPhrases.FORBIDDEN),
-    [HttpStatusCodes.CONFLICT]: jsonContent(errorSchema({ message: "Group name already exists!" }), HttpStatusPhrases.CONFLICT),
-    [HttpStatusCodes.BAD_REQUEST]: jsonContent(errorSchema({ message: "Some members don't exists!" }), HttpStatusPhrases.BAD_REQUEST),
-    [HttpStatusCodes.CREATED]: jsonContent(successSchema({ message: "Group created successfully!" }), HttpStatusPhrases.CREATED),
+    [HttpStatus.UNAUTHORIZED]: jsonContent(
+      errorSchema({ message: "Unauthorized request!" }),
+      HttpPhrases.UNAUTHORIZED,
+    ),
+    [HttpStatus.FORBIDDEN]: jsonContent(
+      errorSchema({ message: "Invalid group admin assignment!" }),
+      HttpPhrases.FORBIDDEN,
+    ),
+    [HttpStatus.CONFLICT]: jsonContent(
+      errorSchema({ message: "Group name already exists!" }),
+      HttpPhrases.CONFLICT,
+    ),
+    [HttpStatus.BAD_REQUEST]: jsonContent(
+      errorSchema({ message: "Some members don't exists!" }),
+      HttpPhrases.BAD_REQUEST,
+    ),
+    [HttpStatus.CREATED]: jsonContent(
+      successSchema({ message: "Group created successfully!" }),
+      HttpPhrases.CREATED,
+    ),
   },
 });
 
@@ -39,10 +61,22 @@ const updateDetailsRoute = createRoute({
     body: jsonRequired(updateDetailsSchema, "Group details payload!"),
   },
   responses: {
-    [HttpStatusCodes.UNAUTHORIZED]: jsonContent(errorSchema({ message: "Unauthorized request!" }), HttpStatusPhrases.UNAUTHORIZED),
-    [HttpStatusCodes.CONFLICT]: jsonContent(errorSchema({ message: "Group name already exists!" }), HttpStatusPhrases.CONFLICT),
-    [HttpStatusCodes.NOT_FOUND]: jsonContent(errorSchema({ message: "Group not found!" }), HttpStatusPhrases.NOT_FOUND),
-    [HttpStatusCodes.OK]: jsonContent(successSchema({ message: "Group details updated successfully!" }), HttpStatusPhrases.OK),
+    [HttpStatus.UNAUTHORIZED]: jsonContent(
+      errorSchema({ message: "Unauthorized request!" }),
+      HttpPhrases.UNAUTHORIZED,
+    ),
+    [HttpStatus.CONFLICT]: jsonContent(
+      errorSchema({ message: "Group name already exists!" }),
+      HttpPhrases.CONFLICT,
+    ),
+    [HttpStatus.NOT_FOUND]: jsonContent(
+      errorSchema({ message: "Group not found!" }),
+      HttpPhrases.NOT_FOUND,
+    ),
+    [HttpStatus.OK]: jsonContent(
+      successSchema({ message: "Group details updated successfully!" }),
+      HttpPhrases.OK,
+    ),
   },
 });
 
@@ -55,11 +89,26 @@ const updateMembersRoute = createRoute({
     body: jsonRequired(updateMembersSchema, "Group members payload!"),
   },
   responses: {
-    [HttpStatusCodes.BAD_REQUEST]: jsonContent(errorSchema({ message: "Provide at least one member!" }), HttpStatusPhrases.BAD_REQUEST),
-    [HttpStatusCodes.UNAUTHORIZED]: jsonContent(errorSchema({ message: "Unauthorized request!" }), HttpStatusPhrases.UNAUTHORIZED),
-    [HttpStatusCodes.FORBIDDEN]: jsonContent(errorSchema({ message: "Admin can't be removed!" }), HttpStatusPhrases.FORBIDDEN),
-    [HttpStatusCodes.NOT_FOUND]: jsonContent(errorSchema({ message: "Group not found!" }), HttpStatusPhrases.NOT_FOUND),
-    [HttpStatusCodes.OK]: jsonContent(successSchema({ message: "Group members updated successfully!" }), HttpStatusPhrases.OK),
+    [HttpStatus.BAD_REQUEST]: jsonContent(
+      errorSchema({ message: "Provide at least one member!" }),
+      HttpPhrases.BAD_REQUEST,
+    ),
+    [HttpStatus.UNAUTHORIZED]: jsonContent(
+      errorSchema({ message: "Unauthorized request!" }),
+      HttpPhrases.UNAUTHORIZED,
+    ),
+    [HttpStatus.FORBIDDEN]: jsonContent(
+      errorSchema({ message: "Admin can't be removed!" }),
+      HttpPhrases.FORBIDDEN,
+    ),
+    [HttpStatus.NOT_FOUND]: jsonContent(
+      errorSchema({ message: "Group not found!" }),
+      HttpPhrases.NOT_FOUND,
+    ),
+    [HttpStatus.OK]: jsonContent(
+      successSchema({ message: "Group members updated successfully!" }),
+      HttpPhrases.OK,
+    ),
   },
 });
 
@@ -72,14 +121,26 @@ const updateAvatarRoute = createRoute({
     body: multipartRequired("group-avatar", "Avatar file for upload!"),
   },
   responses: {
-    [HttpStatusCodes.BAD_REQUEST]: jsonContent(errorSchema({ message: "Invalid avatar file upload!" }), HttpStatusPhrases.BAD_REQUEST),
-    [HttpStatusCodes.UNAUTHORIZED]: jsonContent(errorSchema({ message: "Unauthorized request!" }), HttpStatusPhrases.UNAUTHORIZED),
-    [HttpStatusCodes.NOT_FOUND]: jsonContent(errorSchema({ message: "Group not found!" }), HttpStatusPhrases.NOT_FOUND),
-    [HttpStatusCodes.INTERNAL_SERVER_ERROR]: jsonContent(
-      errorSchema({ message: "Error while uploading avatar!" }),
-      HttpStatusPhrases.INTERNAL_SERVER_ERROR,
+    [HttpStatus.BAD_REQUEST]: jsonContent(
+      errorSchema({ message: "Invalid avatar file upload!" }),
+      HttpPhrases.BAD_REQUEST,
     ),
-    [HttpStatusCodes.OK]: jsonContent(successSchema({ message: "Group avatar updated successfully!" }), HttpStatusPhrases.OK),
+    [HttpStatus.UNAUTHORIZED]: jsonContent(
+      errorSchema({ message: "Unauthorized request!" }),
+      HttpPhrases.UNAUTHORIZED,
+    ),
+    [HttpStatus.NOT_FOUND]: jsonContent(
+      errorSchema({ message: "Group not found!" }),
+      HttpPhrases.NOT_FOUND,
+    ),
+    [HttpStatus.INTERNAL_SERVER_ERROR]: jsonContent(
+      errorSchema({ message: "Error while uploading avatar!" }),
+      HttpPhrases.INTERNAL_SERVER_ERROR,
+    ),
+    [HttpStatus.OK]: jsonContent(
+      successSchema({ message: "Group avatar updated successfully!" }),
+      HttpPhrases.OK,
+    ),
   },
 });
 
@@ -91,10 +152,22 @@ const deleteAvatarRoute = createRoute({
     params: pathParams("id"),
   },
   responses: {
-    [HttpStatusCodes.UNAUTHORIZED]: jsonContent(errorSchema({ message: "Unauthorized request!" }), HttpStatusPhrases.UNAUTHORIZED),
-    [HttpStatusCodes.NOT_FOUND]: jsonContent(errorSchema({ message: "Group not found!" }), HttpStatusPhrases.NOT_FOUND),
-    [HttpStatusCodes.BAD_REQUEST]: jsonContent(errorSchema({ message: "Group avatar not available!" }), HttpStatusPhrases.BAD_REQUEST),
-    [HttpStatusCodes.OK]: jsonContent(successSchema({ message: "Group avatar deleted successfully!" }), HttpStatusPhrases.OK),
+    [HttpStatus.UNAUTHORIZED]: jsonContent(
+      errorSchema({ message: "Unauthorized request!" }),
+      HttpPhrases.UNAUTHORIZED,
+    ),
+    [HttpStatus.NOT_FOUND]: jsonContent(
+      errorSchema({ message: "Group not found!" }),
+      HttpPhrases.NOT_FOUND,
+    ),
+    [HttpStatus.BAD_REQUEST]: jsonContent(
+      errorSchema({ message: "Group avatar not available!" }),
+      HttpPhrases.BAD_REQUEST,
+    ),
+    [HttpStatus.OK]: jsonContent(
+      successSchema({ message: "Group avatar deleted successfully!" }),
+      HttpPhrases.OK,
+    ),
   },
 });
 
@@ -103,8 +176,14 @@ const fetchGroupRoute = createRoute({
   method: "get",
   path: "/fetch",
   responses: {
-    [HttpStatusCodes.UNAUTHORIZED]: jsonContent(errorSchema({ message: "Unauthorized request!" }), HttpStatusPhrases.UNAUTHORIZED),
-    [HttpStatusCodes.OK]: jsonContent(successSchema({ message: "Group fetched successfully!", data: [] }), HttpStatusPhrases.OK),
+    [HttpStatus.UNAUTHORIZED]: jsonContent(
+      errorSchema({ message: "Unauthorized request!" }),
+      HttpPhrases.UNAUTHORIZED,
+    ),
+    [HttpStatus.OK]: jsonContent(
+      successSchema({ message: "Group fetched successfully!", data: [] }),
+      HttpPhrases.OK,
+    ),
   },
 });
 
