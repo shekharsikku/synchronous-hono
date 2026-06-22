@@ -4,11 +4,23 @@ import env from "#/configs/env.js";
 import { imagekitDelete, imagekitUpload } from "#/configs/imagekit.js";
 import { User } from "#/models/index.js";
 import type { AppRouteHandler } from "#/openapi/index.js";
-import type { DeleteImageRoute, PasswordChangeRoute, ProfileSetupRoute, UpdateImageRoute, UserInformationRoute } from "#/routes/user.js";
+import type {
+  DeleteImageRoute,
+  PasswordChangeRoute,
+  ProfileSetupRoute,
+  UpdateImageRoute,
+  UserInformationRoute,
+} from "#/routes/user.js";
 import { emitEvent, getSockets } from "#/server.js";
 import { eventsService } from "#/services/events.js";
-import { argonOptions, createUserInfo, generateAccess, hasEmptyField, type UserInfo } from "#/utilities/helpers.js";
-import { HttpResponse, HttpStatusCodes } from "#/utilities/http/index.js";
+import {
+  argonOptions,
+  createUserInfo,
+  generateAccess,
+  hasEmptyField,
+  type UserInfo,
+} from "#/utilities/helpers.js";
+import { HttpResponse, HttpStatus } from "#/utilities/http/index.js";
 import { revokeToken } from "./auth.js";
 
 const profileUpdateEvents = async (userData: UserInfo) => {
@@ -18,13 +30,13 @@ const profileUpdateEvents = async (userData: UserInfo) => {
 
 export const profileSetup: AppRouteHandler<ProfileSetupRoute> = async (ctx) => {
   const { name, username, gender, bio } = ctx.req.valid("json");
-  const requestUser = ctx.req.user!;
+  const requestUser = ctx.var.user;
 
   if (username !== requestUser?.username) {
     const existsUsername = await User.exists({ username });
 
     if (existsUsername) {
-      return HttpResponse.error(ctx, HttpStatusCodes.CONFLICT, "Username already exists!");
+      return HttpResponse.error(ctx, HttpStatus.CONFLICT, "Username already exists!");
     }
   }
 
@@ -46,7 +58,7 @@ export const profileSetup: AppRouteHandler<ProfileSetupRoute> = async (ctx) => {
       await revokeToken(ctx, currentAuthKey);
     }
 
-    return HttpResponse.error(ctx, HttpStatusCodes.UNAUTHORIZED, "Please, sign in again!");
+    return HttpResponse.error(ctx, HttpStatus.UNAUTHORIZED, "Please, sign in again!");
   }
 
   const userInfo = createUserInfo(updatedProfile);
@@ -56,23 +68,23 @@ export const profileSetup: AppRouteHandler<ProfileSetupRoute> = async (ctx) => {
   }
 
   if (!userInfo.setup) {
-    return HttpResponse.success(ctx, HttpStatusCodes.OK, "Complete your profile!", userInfo);
+    return HttpResponse.success(ctx, HttpStatus.OK, "Complete your profile!", userInfo);
   }
 
   await generateAccess(ctx, userInfo);
   await profileUpdateEvents(userInfo);
 
-  return HttpResponse.success(ctx, HttpStatusCodes.OK, "Profile updated successfully!", userInfo);
+  return HttpResponse.success(ctx, HttpStatus.OK, "Profile updated successfully!", userInfo);
 };
 
 export const updateImage: AppRouteHandler<UpdateImageRoute> = async (ctx) => {
   const { "profile-image": imageFile } = ctx.req.valid("form");
 
   if (!imageFile || !(imageFile instanceof File)) {
-    return HttpResponse.error(ctx, HttpStatusCodes.BAD_REQUEST, "Invalid image file upload!");
+    return HttpResponse.error(ctx, HttpStatus.BAD_REQUEST, "Invalid image file upload!");
   }
 
-  const requestUser = await User.findById(ctx.req.user?._id);
+  const requestUser = await User.findById(ctx.var.user._id);
 
   if (!requestUser) {
     const currentAuthKey = await getSignedCookie(ctx, env.SIGNED_SECRET, "current");
@@ -81,13 +93,17 @@ export const updateImage: AppRouteHandler<UpdateImageRoute> = async (ctx) => {
       await revokeToken(ctx, currentAuthKey);
     }
 
-    return HttpResponse.error(ctx, HttpStatusCodes.UNAUTHORIZED, "Please, sign in again!");
+    return HttpResponse.error(ctx, HttpStatus.UNAUTHORIZED, "Please, sign in again!");
   }
 
   const uploadedImage = await imagekitUpload(imageFile);
 
   if (!uploadedImage?.url) {
-    return HttpResponse.error(ctx, HttpStatusCodes.INTERNAL_SERVER_ERROR, "Error while uploading image!");
+    return HttpResponse.error(
+      ctx,
+      HttpStatus.INTERNAL_SERVER_ERROR,
+      "Error while uploading image!",
+    );
   }
 
   if (requestUser.image) {
@@ -106,11 +122,11 @@ export const updateImage: AppRouteHandler<UpdateImageRoute> = async (ctx) => {
   await generateAccess(ctx, userInfo);
   await profileUpdateEvents(userInfo);
 
-  return HttpResponse.success(ctx, HttpStatusCodes.OK, "Image updated successfully!", userInfo);
+  return HttpResponse.success(ctx, HttpStatus.OK, "Image updated successfully!", userInfo);
 };
 
 export const deleteImage: AppRouteHandler<DeleteImageRoute> = async (ctx) => {
-  const requestUser = await User.findById(ctx.req.user?._id);
+  const requestUser = await User.findById(ctx.var.user._id);
 
   if (!requestUser) {
     const currentAuthKey = await getSignedCookie(ctx, env.SIGNED_SECRET, "current");
@@ -119,11 +135,11 @@ export const deleteImage: AppRouteHandler<DeleteImageRoute> = async (ctx) => {
       await revokeToken(ctx, currentAuthKey);
     }
 
-    return HttpResponse.error(ctx, HttpStatusCodes.UNAUTHORIZED, "Please, sign in again!");
+    return HttpResponse.error(ctx, HttpStatus.UNAUTHORIZED, "Please, sign in again!");
   }
 
   if (!requestUser?.image) {
-    return HttpResponse.error(ctx, HttpStatusCodes.NOT_FOUND, "Image not available!");
+    return HttpResponse.error(ctx, HttpStatus.NOT_FOUND, "Image not available!");
   }
 
   const imageUrl = new URL(requestUser.image);
@@ -140,17 +156,17 @@ export const deleteImage: AppRouteHandler<DeleteImageRoute> = async (ctx) => {
   await generateAccess(ctx, userInfo);
   await profileUpdateEvents(userInfo);
 
-  return HttpResponse.success(ctx, HttpStatusCodes.OK, "Image deleted successfully!", userInfo);
+  return HttpResponse.success(ctx, HttpStatus.OK, "Image deleted successfully!", userInfo);
 };
 
 export const changePassword: AppRouteHandler<PasswordChangeRoute> = async (ctx) => {
   const { old_password, new_password } = ctx.req.valid("json");
 
   if (old_password === new_password) {
-    return HttpResponse.error(ctx, HttpStatusCodes.BAD_REQUEST, "New password must be different!");
+    return HttpResponse.error(ctx, HttpStatus.BAD_REQUEST, "New password must be different!");
   }
 
-  const requestUser = await User.findById(ctx.req.user?._id).select("+password");
+  const requestUser = await User.findById(ctx.var.user._id).select("+password");
 
   if (!requestUser) {
     const currentAuthKey = await getSignedCookie(ctx, env.SIGNED_SECRET, "current");
@@ -159,11 +175,11 @@ export const changePassword: AppRouteHandler<PasswordChangeRoute> = async (ctx) 
       await revokeToken(ctx, currentAuthKey);
     }
 
-    return HttpResponse.error(ctx, HttpStatusCodes.UNAUTHORIZED, "Please, sign in again!");
+    return HttpResponse.error(ctx, HttpStatus.UNAUTHORIZED, "Please, sign in again!");
   }
 
   if (!(await verify(requestUser.password, old_password))) {
-    return HttpResponse.error(ctx, HttpStatusCodes.FORBIDDEN, "Incorrect old password!");
+    return HttpResponse.error(ctx, HttpStatus.FORBIDDEN, "Incorrect old password!");
   }
 
   requestUser.password = await hash(new_password, argonOptions);
@@ -173,9 +189,9 @@ export const changePassword: AppRouteHandler<PasswordChangeRoute> = async (ctx) 
   await generateAccess(ctx, userInfo);
   await profileUpdateEvents(userInfo);
 
-  return HttpResponse.success(ctx, HttpStatusCodes.OK, "Password changed successfully!", userInfo);
+  return HttpResponse.success(ctx, HttpStatus.OK, "Password changed successfully!", userInfo);
 };
 
 export const userInformation: AppRouteHandler<UserInformationRoute> = async (ctx) => {
-  return HttpResponse.success(ctx, HttpStatusCodes.OK, "User information!", ctx.req.user);
+  return HttpResponse.success(ctx, HttpStatus.OK, "User information!", ctx.var.user);
 };

@@ -9,8 +9,14 @@ import { User } from "#/models/index.js";
 import type { AppRouteHandler } from "#/openapi/index.js";
 import type { RefreshRoute, SignInRoute, SignOutRoute, SignUpRoute } from "#/routes/auth.js";
 import { decryptAuth, generateHash, refreshSecret } from "#/utilities/crypto.js";
-import { argonOptions, cookieOptions, createUserInfo, generateAccess, generateRefresh } from "#/utilities/helpers.js";
-import { HttpError, HttpResponse, HttpStatusCodes } from "#/utilities/http/index.js";
+import {
+  argonOptions,
+  cookieOptions,
+  createUserInfo,
+  generateAccess,
+  generateRefresh,
+} from "#/utilities/helpers.js";
+import { HttpError, HttpResponse, HttpStatus } from "#/utilities/http/index.js";
 
 const parseAuthKey = (token: string) => {
   const { uid, aid } = decryptAuth(token);
@@ -22,9 +28,9 @@ const parseAuthKey = (token: string) => {
   return { userId: new Types.ObjectId(uid), authId: new Types.ObjectId(aid) };
 };
 
-export const revokeToken = async <C extends Context>(ctx: C, authKey: any) => {
+export const revokeToken = async <C extends Context>(ctx: C, token: string) => {
   try {
-    const { userId, authId } = parseAuthKey(authKey);
+    const { userId, authId } = parseAuthKey(token);
 
     await User.updateOne(
       {
@@ -54,7 +60,7 @@ export const signUpUser: AppRouteHandler<SignUpRoute> = async (ctx) => {
   const existsEmail = await User.exists({ email });
 
   if (existsEmail) {
-    return HttpResponse.error(ctx, HttpStatusCodes.CONFLICT, "Email already exists!");
+    return HttpResponse.error(ctx, HttpStatus.CONFLICT, "Email already exists!");
   }
 
   const hashed = await hash(password, argonOptions);
@@ -63,7 +69,7 @@ export const signUpUser: AppRouteHandler<SignUpRoute> = async (ctx) => {
   const userInfo = createUserInfo(newUser);
   await generateAccess(ctx, userInfo);
 
-  return HttpResponse.success(ctx, HttpStatusCodes.CREATED, "Signed up successfully!", userInfo);
+  return HttpResponse.success(ctx, HttpStatus.CREATED, "Signed up successfully!", userInfo);
 };
 
 export const signInUser: AppRouteHandler<SignInRoute> = async (ctx) => {
@@ -76,7 +82,7 @@ export const signInUser: AppRouteHandler<SignInRoute> = async (ctx) => {
   } else if (username) {
     conditions.push({ username });
   } else {
-    return HttpResponse.error(ctx, HttpStatusCodes.BAD_REQUEST, "Required email or username!");
+    return HttpResponse.error(ctx, HttpStatus.BAD_REQUEST, "Required email or username!");
   }
 
   const existsUser = await User.findOne({
@@ -84,14 +90,14 @@ export const signInUser: AppRouteHandler<SignInRoute> = async (ctx) => {
   }).select("+password +authentication");
 
   if (!existsUser || !(await verify(existsUser.password, password))) {
-    return HttpResponse.error(ctx, HttpStatusCodes.UNAUTHORIZED, "Invalid credentials!");
+    return HttpResponse.error(ctx, HttpStatus.UNAUTHORIZED, "Invalid credentials!");
   }
 
   const userInfo = createUserInfo(existsUser);
   await generateAccess(ctx, userInfo);
 
   if (!userInfo.setup) {
-    return HttpResponse.success(ctx, HttpStatusCodes.OK, "Complete your profile!", userInfo);
+    return HttpResponse.success(ctx, HttpStatus.OK, "Complete your profile!", userInfo);
   }
 
   const authorizeId = new Types.ObjectId();
@@ -107,7 +113,7 @@ export const signInUser: AppRouteHandler<SignInRoute> = async (ctx) => {
 
   await existsUser.save();
 
-  return HttpResponse.success(ctx, HttpStatusCodes.OK, "Signed in successfully!", userInfo);
+  return HttpResponse.success(ctx, HttpStatus.OK, "Signed in successfully!", userInfo);
 };
 
 export const signOutUser: AppRouteHandler<SignOutRoute> = async (ctx) => {
@@ -121,7 +127,7 @@ export const signOutUser: AppRouteHandler<SignOutRoute> = async (ctx) => {
   deleteCookie(ctx, "refresh", cookieOptions);
   deleteCookie(ctx, "current", cookieOptions);
 
-  return HttpResponse.success(ctx, HttpStatusCodes.OK, "Signed out successfully!");
+  return HttpResponse.success(ctx, HttpStatus.OK, "Signed out successfully!");
 };
 
 export const authRefresh: AppRouteHandler<RefreshRoute> = async (ctx) => {
@@ -130,7 +136,7 @@ export const authRefresh: AppRouteHandler<RefreshRoute> = async (ctx) => {
   const currentAuthKey = await getSignedCookie(ctx, env.SIGNED_SECRET, "current");
 
   if (!refreshToken || !currentAuthKey) {
-    return HttpResponse.error(ctx, HttpStatusCodes.UNAUTHORIZED, "Unauthorized request!");
+    return HttpResponse.error(ctx, HttpStatus.UNAUTHORIZED, "Unauthorized request!");
   }
 
   const verifiedData = await (async () => {
@@ -160,7 +166,7 @@ export const authRefresh: AppRouteHandler<RefreshRoute> = async (ctx) => {
       };
     } catch {
       await revokeToken(ctx, currentAuthKey);
-      throw new HttpError(HttpStatusCodes.UNAUTHORIZED, "Please, sign in again!");
+      throw new HttpError(HttpStatus.UNAUTHORIZED, "Please, sign in again!");
     }
   })();
 
@@ -178,7 +184,7 @@ export const authRefresh: AppRouteHandler<RefreshRoute> = async (ctx) => {
   const requestUser = await User.findOne(authFilter);
 
   if (!requestUser) {
-    return HttpResponse.error(ctx, HttpStatusCodes.UNAUTHORIZED, "Please, sign in again!");
+    return HttpResponse.error(ctx, HttpStatus.UNAUTHORIZED, "Please, sign in again!");
   }
 
   const userInfo = createUserInfo(requestUser);
@@ -198,11 +204,11 @@ export const authRefresh: AppRouteHandler<RefreshRoute> = async (ctx) => {
 
     if (updatedResult.modifiedCount === 0) {
       await revokeToken(ctx, currentAuthKey);
-      return HttpResponse.error(ctx, HttpStatusCodes.UNAUTHORIZED, "Please, sign in again!");
+      return HttpResponse.error(ctx, HttpStatus.UNAUTHORIZED, "Please, sign in again!");
     }
   }
 
   await generateAccess(ctx, userInfo);
 
-  return HttpResponse.success(ctx, HttpStatusCodes.OK, "Refreshed successfully!", userInfo);
+  return HttpResponse.success(ctx, HttpStatus.OK, "Refreshed successfully!", userInfo);
 };

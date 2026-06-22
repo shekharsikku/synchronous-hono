@@ -1,6 +1,11 @@
-import { translate } from "bing-translate-api";
+/** biome-ignore-all lint/style/noNonNullAssertion: <recipient is available> */
 import { Types } from "mongoose";
-import type { ConversationDocument, MessageContent, MessageDocument, MessageType } from "#/models/index.js";
+import type {
+  ConversationDocument,
+  MessageContent,
+  MessageDocument,
+  MessageType,
+} from "#/models/index.js";
 import { Conversation, Message } from "#/models/index.js";
 import type { AppRouteHandler } from "#/openapi/types.js";
 import type {
@@ -11,10 +16,9 @@ import type {
   GetMessageRoute,
   ReactMessageRoute,
   SendMessageRoute,
-  TranslateMessageRoute,
 } from "#/routes/message.js";
 import { emitEvent, getSockets } from "#/server.js";
-import { HttpResponse, HttpStatusCodes } from "#/utilities/http/index.js";
+import { HttpResponse, HttpStatus } from "#/utilities/http/index.js";
 import { sendPushNotification } from "#/utilities/push.js";
 import { fetchMembers } from "./group.js";
 
@@ -24,7 +28,13 @@ const buildContent = ({ type, text, file }: MessageContent) => {
   return { type };
 };
 
-const emitMessage = (sockets: string[], message: MessageDocument, targetId: string, targetType: "contact" | "group", interaction: Date) => {
+const emitMessage = (
+  sockets: string[],
+  message: MessageDocument,
+  targetId: string,
+  targetType: "contact" | "group",
+  interaction: Date,
+) => {
   emitEvent(sockets, "message:receive", message);
   emitEvent(sockets, "conversation:updated", {
     _id: targetId,
@@ -33,7 +43,10 @@ const emitMessage = (sockets: string[], message: MessageDocument, targetId: stri
   });
 };
 
-const resolveMembers = async (conversation: ConversationDocument | null, groupId: Types.ObjectId): Promise<string[]> => {
+const resolveMembers = async (
+  conversation: ConversationDocument | null,
+  groupId: Types.ObjectId,
+): Promise<string[]> => {
   if (conversation) {
     const populated = await conversation.populate("participants");
     const members = (populated.participants?.[0] as { members?: Types.ObjectId[] })?.members ?? [];
@@ -43,7 +56,7 @@ const resolveMembers = async (conversation: ConversationDocument | null, groupId
 };
 
 export const sendMessage: AppRouteHandler<SendMessageRoute> = async (ctx) => {
-  const senderId = ctx.req.user?._id!;
+  const senderId = ctx.var.user._id;
   const receiverId = new Types.ObjectId(ctx.req.valid("param").id);
   const isGroup = ctx.req.valid("query").type === "group";
   const { type, text, file, reply } = ctx.req.valid("json");
@@ -92,14 +105,14 @@ export const sendMessage: AppRouteHandler<SendMessageRoute> = async (ctx) => {
       emitMessage(recipientSockets, message, messageSender, "contact", interaction);
     } else {
       sendPushNotification(receiverId, {
-        title: ctx.req.user?.name ?? ctx.req.user?.username ?? "Someone",
+        title: ctx.var.user?.name ?? ctx.var.user?.username ?? "Someone",
         body: "Sent you a new message.",
         data: { sid: messageSender },
       }).catch(() => {});
     }
   }
 
-  return HttpResponse.success(ctx, HttpStatusCodes.CREATED, "Message sent successfully!", message);
+  return HttpResponse.success(ctx, HttpStatus.CREATED, "Message sent successfully!", message);
 };
 
 /** Transform null → undefined in response payload only */
@@ -112,7 +125,7 @@ const nullToUndefined = (obj: Record<string, any>) => {
 };
 
 export const getMessages: AppRouteHandler<GetMessageRoute> = async (ctx) => {
-  const sender = ctx.req.user?._id!;
+  const sender = ctx.var.user._id;
   const target = ctx.req.valid("param").id;
   const isGroup = ctx.req.valid("query").group;
 
@@ -130,11 +143,16 @@ export const getMessages: AppRouteHandler<GetMessageRoute> = async (ctx) => {
     .limit(20)
     .lean({ transform: (doc) => nullToUndefined(doc) });
 
-  return HttpResponse.success(ctx, HttpStatusCodes.OK, "Messages fetched successfully!", messages.reverse());
+  return HttpResponse.success(
+    ctx,
+    HttpStatus.OK,
+    "Messages fetched successfully!",
+    messages.reverse(),
+  );
 };
 
 export const fetchMessages: AppRouteHandler<FetchMessageRoute> = async (ctx) => {
-  const sender = ctx.req.user?._id!;
+  const sender = ctx.var.user._id;
   const target = ctx.req.valid("param").id;
   const { before, group: isGroup, limit } = ctx.req.valid("query");
 
@@ -157,7 +175,12 @@ export const fetchMessages: AppRouteHandler<FetchMessageRoute> = async (ctx) => 
     .lean({ transform: (doc) => nullToUndefined(doc) });
 
   /* Reverse to show oldest → newest in UI */
-  return HttpResponse.success(ctx, HttpStatusCodes.OK, "Messages fetched successfully!", messages.reverse());
+  return HttpResponse.success(
+    ctx,
+    HttpStatus.OK,
+    "Messages fetched successfully!",
+    messages.reverse(),
+  );
 };
 
 const messageActionsEvents = async (message: MessageType, event: string) => {
@@ -166,22 +189,24 @@ const messageActionsEvents = async (message: MessageType, event: string) => {
     const sockets = members.flatMap(getSockets).filter(Boolean);
     emitEvent(sockets, event, message);
   } else {
-    const sockets = [message.sender, message.recipient!].flatMap((uid) => getSockets(uid.toString())).filter(Boolean);
+    const sockets = [message.sender, message.recipient!]
+      .flatMap((uid) => getSockets(uid.toString()))
+      .filter(Boolean);
     emitEvent(sockets, event, message);
   }
 };
 
 export const editMessage: AppRouteHandler<EditMessageRoute> = async (ctx) => {
-  const uid = ctx.req.user?._id!;
-  const mid = ctx.req.valid("param").id;
   const { text } = ctx.req.valid("json");
+  const msgId = ctx.req.valid("param").id;
+  const userId = ctx.var.user._id;
 
   if (!text.trim()) {
-    return HttpResponse.error(ctx, HttpStatusCodes.BAD_REQUEST, "Text content is required!");
+    return HttpResponse.error(ctx, HttpStatus.BAD_REQUEST, "Text content is required!");
   }
 
   const message = await Message.findOneAndUpdate(
-    { _id: mid, sender: uid, "content.type": "text" },
+    { _id: msgId, sender: userId, "content.type": "text" },
     {
       type: "edited",
       "content.text": text,
@@ -190,20 +215,20 @@ export const editMessage: AppRouteHandler<EditMessageRoute> = async (ctx) => {
   ).lean({ transform: (doc) => nullToUndefined(doc) });
 
   if (!message) {
-    return HttpResponse.error(ctx, HttpStatusCodes.BAD_REQUEST, "You can't edit this message!");
+    return HttpResponse.error(ctx, HttpStatus.BAD_REQUEST, "You can't edit this message!");
   }
 
   await messageActionsEvents(message, "message:edited");
 
-  return HttpResponse.success(ctx, HttpStatusCodes.OK, "Message edited successfully!");
+  return HttpResponse.success(ctx, HttpStatus.OK, "Message edited successfully!", message);
 };
 
 export const deleteMessage: AppRouteHandler<DeleteMessageRoute> = async (ctx) => {
-  const uid = ctx.req.user?._id!;
-  const mid = ctx.req.valid("param").id;
+  const msgId = ctx.req.valid("param").id;
+  const userId = ctx.var.user._id;
 
   const message = await Message.findOneAndUpdate(
-    { _id: mid, sender: uid },
+    { _id: msgId, sender: userId },
     {
       type: "deleted",
       deletedAt: new Date(),
@@ -213,25 +238,25 @@ export const deleteMessage: AppRouteHandler<DeleteMessageRoute> = async (ctx) =>
   ).lean({ transform: (doc) => nullToUndefined(doc) });
 
   if (!message) {
-    return HttpResponse.error(ctx, HttpStatusCodes.BAD_REQUEST, "You can't delete this message!");
+    return HttpResponse.error(ctx, HttpStatus.BAD_REQUEST, "You can't delete this message!");
   }
 
   await messageActionsEvents(message, "message:remove");
 
-  return HttpResponse.success(ctx, HttpStatusCodes.OK, "Message deleted successfully!");
+  return HttpResponse.success(ctx, HttpStatus.OK, "Message deleted successfully!", message);
 };
 
 export const reactMessage: AppRouteHandler<ReactMessageRoute> = async (ctx) => {
-  const by = ctx.req.user?._id!;
-  const mid = ctx.req.valid("param").id;
   const { emoji } = ctx.req.valid("json");
+  const msgId = ctx.req.valid("param").id;
+  const by = ctx.var.user._id;
 
   if (!emoji.trim()) {
-    return HttpResponse.error(ctx, HttpStatusCodes.BAD_REQUEST, "Emoji is required for reacting!");
+    return HttpResponse.error(ctx, HttpStatus.BAD_REQUEST, "Emoji is required for reacting!");
   }
 
   const message = await Message.findOneAndUpdate(
-    { _id: mid },
+    { _id: msgId },
     [
       {
         $set: {
@@ -302,16 +327,16 @@ export const reactMessage: AppRouteHandler<ReactMessageRoute> = async (ctx) => {
   ).lean({ transform: (doc) => nullToUndefined(doc) });
 
   if (!message) {
-    return HttpResponse.error(ctx, HttpStatusCodes.BAD_REQUEST, "Unable to react on this message!");
+    return HttpResponse.error(ctx, HttpStatus.BAD_REQUEST, "Unable to react on this message!");
   }
 
   await messageActionsEvents(message, "message:reacted");
 
-  return HttpResponse.success(ctx, HttpStatusCodes.OK, "Message reacted successfully!", message);
+  return HttpResponse.success(ctx, HttpStatus.OK, "Message reacted successfully!", message);
 };
 
 export const deleteMessages: AppRouteHandler<DeleteMessagesRoute> = async (ctx) => {
-  const userId = ctx.req.user?._id!;
+  const userId = ctx.var.user._id;
   const before = ctx.req.valid("query").before * 24;
 
   const hoursAgo = new Date();
@@ -322,21 +347,5 @@ export const deleteMessages: AppRouteHandler<DeleteMessagesRoute> = async (ctx) 
     createdAt: { $lt: hoursAgo },
   });
 
-  return HttpResponse.success(ctx, HttpStatusCodes.OK, "Older messages deleted!", result);
-};
-
-export const translateMessage: AppRouteHandler<TranslateMessageRoute> = async (ctx) => {
-  const { message, language } = ctx.req.valid("json");
-
-  if (!message || !language) {
-    return HttpResponse.error(ctx, HttpStatusCodes.BAD_REQUEST, "Required message and language!");
-  }
-
-  const result = await translate(message, null, language);
-
-  if (!result) {
-    return HttpResponse.error(ctx, HttpStatusCodes.INTERNAL_SERVER_ERROR, "Error while translating message!");
-  }
-
-  return HttpResponse.success(ctx, HttpStatusCodes.OK, "Text translated successfully!", result.translation);
+  return HttpResponse.success(ctx, HttpStatus.OK, "Older messages deleted!", result);
 };
