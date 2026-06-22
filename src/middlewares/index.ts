@@ -44,16 +44,27 @@ export const validate =
     return await next();
   };
 
+const getClientIp = (ctx: Context): string => {
+  return (
+    ctx.req.header("x-forwarded-for")?.split(",")[0]?.trim() ??
+    ctx.req.header("cf-connecting-ip") ??
+    ctx.req.header("true-client-ip") ??
+    ctx.req.header("x-real-ip") ??
+    ctx.req.header("x-client-ip") ??
+    "unknown-ip"
+  );
+};
+
 export const limiter = (minutes = 10, limit = 1000) => {
   return rateLimiter({
     windowMs: minutes * 60 * 1000,
     limit: limit,
     standardHeaders: true,
     keyGenerator: (ctx) => {
-      return ctx.req.header("x-device-id") ?? "unknown-device";
+      return getClientIp(ctx);
     },
-    handler: (ctx: Context) => {
-      ctx.var.logger.error(`Rate limit exceeded for ID: ${ctx.req.header("x-device-id")}`);
+    handler: (ctx) => {
+      ctx.var.logger.error("Rate limit exceeded for ip: %s", getClientIp(ctx));
       throw new HttpError(429, "You've made too many requests!");
     },
   });

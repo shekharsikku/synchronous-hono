@@ -24,7 +24,16 @@ void (async () => {
 
     const server = Bun.serve({
       ...engine.handler(),
-      fetch: app.fetch,
+      fetch: (request, server) => {
+        if (env.isDev) {
+          const ip = server.requestIP(request)?.address;
+
+          if (ip) {
+            request.headers.set("x-client-ip", ip);
+          }
+        }
+        return app.fetch(request, server);
+      },
       port: env.PORT,
       maxRequestBodySize: env.BODY_LIMIT * 1024 * 1024,
     });

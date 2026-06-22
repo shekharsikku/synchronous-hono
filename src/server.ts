@@ -5,9 +5,7 @@ import { logger } from "#/middlewares/index.js";
 
 export const engine = new Engine();
 
-const io = new Server({
-  cors: { origin: env.CORS_ORIGIN, credentials: true },
-});
+const io = new Server();
 
 io.bind(engine);
 
@@ -27,8 +25,8 @@ const hasSocket = (uid: string, sid: string) => {
 };
 
 export const getSockets = (uid: string) => {
-  const userSockets = socketMap.get(uid) || new Set<string>();
-  return Array.from(userSockets);
+  const sockets = socketMap.get(uid) ?? new Set<string>();
+  return Array.from(sockets);
 };
 
 export const emitEvent = (sockets: string[], event: string, payload: any) => {
