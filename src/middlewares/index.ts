@@ -1,16 +1,16 @@
 import { inflateSync } from "node:zlib";
-import type { Context, Next } from "hono";
+import type { Context, MiddlewareHandler } from "hono";
 import { getSignedCookie } from "hono/cookie";
 import { rateLimiter } from "hono-rate-limiter";
 import { compactDecrypt } from "jose";
 import pino from "pino";
-import type { ZodType } from "zod";
 import env from "#/configs/env.js";
+import type { AppBindings } from "#/openapi/index.js";
 import { accessSecret } from "#/utilities/crypto.js";
 import type { UserInfo } from "#/utilities/helpers.js";
-import { HttpError } from "#/utilities/response.js";
+import { HttpResponse, HttpStatus } from "#/utilities/http/index.js";
 
-const authorizeAccess = async (ctx: Context): Promise<UserInfo> => {
+const authorizeAccess = async <C extends Context>(ctx: C): Promise<UserInfo> => {
   const accessToken = await getSignedCookie(ctx, env.SIGNED_SECRET, "access");
   if (!accessToken) throw new Error("No access token available!");
 
@@ -18,33 +18,25 @@ const authorizeAccess = async (ctx: Context): Promise<UserInfo> => {
   return JSON.parse(inflateSync(decryptedAccess.plaintext).toString());
 };
 
-export const authAccess = async (ctx: Context, next: Next) => {
+export const authAccess: MiddlewareHandler<AppBindings> = async (ctx, next) => {
   try {
-    ctx.req.user = await authorizeAccess(ctx);
+    ctx.set("user", await authorizeAccess(ctx));
     return await next();
   } catch {
-    throw new HttpError(401, "Unauthorized access request!");
+    return HttpResponse.error(ctx, HttpStatus.UNAUTHORIZED, "Unauthorized request!");
   }
 };
 
-export const authEvents = async (ctx: Context, next: Next) => {
+export const authEvents: MiddlewareHandler<AppBindings> = async (ctx, next) => {
   try {
-    ctx.req.user = await authorizeAccess(ctx);
+    ctx.set("user", await authorizeAccess(ctx));
     return await next();
   } catch {
-    return ctx.text("Unauthorized events request!", 401);
+    return ctx.text("Unauthorized request!", HttpStatus.UNAUTHORIZED);
   }
 };
 
-export const validate =
-  <T>(schema: ZodType<T>) =>
-  async (ctx: Context, next: Next) => {
-    const payload = await ctx.req.json();
-    ctx.set("validated", schema.parse(payload));
-    return await next();
-  };
-
-const getClientIp = (ctx: Context): string => {
+const getClientIp = <C extends Context>(ctx: C): string => {
   return (
     ctx.req.header("x-forwarded-for")?.split(",")[0]?.trim() ??
     ctx.req.header("cf-connecting-ip") ??
@@ -55,7 +47,7 @@ const getClientIp = (ctx: Context): string => {
   );
 };
 
-export const limiter = (minutes = 10, limit = 1000) => {
+export const limiter = (minutes = 10, limit = 10000) => {
   return rateLimiter({
     windowMs: minutes * 60 * 1000,
     limit: limit,
@@ -65,18 +57,25 @@ export const limiter = (minutes = 10, limit = 1000) => {
     },
     handler: (ctx) => {
       ctx.var.logger.error("Rate limit exceeded for ip: %s", getClientIp(ctx));
-      throw new HttpError(429, "You've made too many requests!");
+      return HttpResponse.error(
+        ctx,
+        HttpStatus.TOO_MANY_REQUESTS,
+        "You've made too many requests!",
+      );
     },
   });
 };
 
-const otherOptions = env.isDev ? { transport: { target: "pino-pretty", options: { colorize: true } } } : { base: null };
+const otherOptions = env.isDev
+  ? { transport: { target: "pino-pretty", options: { colorize: true } } }
+  : { base: null };
 
 export const logger = pino({
   level: env.LOG_LEVEL,
   serializers: {
     res(res) {
-      const headers = res.headers instanceof Headers ? Object.fromEntries(res.headers.entries()) : res.headers;
+      const headers =
+        res.headers instanceof Headers ? Object.fromEntries(res.headers.entries()) : res.headers;
       delete headers["set-cookie"];
       return { status: res.status, headers };
     },

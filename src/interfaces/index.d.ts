@@ -1,13 +1,5 @@
-import type { PinoLogger } from "hono-pino";
-import type { UserInfo } from "#/utilities/helpers.ts";
+import type { AppVariables } from "#/openapi/index.ts";
 
 declare module "hono" {
-  interface ContextVariableMap {
-    user?: UserInfo;
-    logger: PinoLogger;
-  }
-
-  interface HonoRequest {
-    user?: UserInfo;
-  }
+  interface ContextVariableMap extends AppVariables {}
 }
