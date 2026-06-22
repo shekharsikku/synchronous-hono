@@ -12,7 +12,7 @@ import { HttpError, HttpResponse } from "#/utilities/response.js";
 
 webpush.setVapidDetails(env.VAPID_MAILTO, env.VAPID_PUBLIC_KEY, env.VAPID_PRIVATE_KEY);
 
-const app = new Hono({ strict: env.STRICT_MODE });
+const app = new Hono({ strict: env.isProd });
 
 app.use(requestId());
 app.use(pinoLogger({ pino: logger }));

@@ -1,4 +1,4 @@
-import { bool, cleanEnv, num, port, str, url } from "envalid";
+import { cleanEnv, num, port, str, url } from "envalid";
 import "dotenv/config";
 
 const env = cleanEnv(process.env, {
@@ -17,10 +17,9 @@ const env = cleanEnv(process.env, {
   SOCKET_PUBLIC: str(),
   MONGODB_URI: url(),
 
-  STRICT_MODE: bool({ default: false }),
-  BODY_LIMIT: num({ default: 1 }),
-  CORS_ORIGIN: str({ default: "*" }),
-  PORT: port({ default: 4000 }),
+  BODY_LIMIT: num(),
+  CORS_ORIGIN: str(),
+  PORT: port(),
   NODE_ENV: str({
     choices: ["development", "production"],
     default: "development",
