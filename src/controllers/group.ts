@@ -244,24 +244,36 @@ export const fetchGroups: AppRouteHandler<FetchGroupRoute> = async (ctx) => {
     {
       $lookup: {
         from: "conversations",
-        localField: "_id",
-        foreignField: "participants",
+        let: { groupId: "$_id" },
+        pipeline: [
+          {
+            $match: {
+              $expr: {
+                $in: ["$$groupId", "$participants"],
+              },
+            },
+          },
+          {
+            $project: {
+              _id: 0,
+              interaction: 1,
+            },
+          },
+        ],
         as: "conversation",
       },
     },
     {
-      $addFields: {
-        interaction: { $arrayElemAt: ["$conversation.interaction", 0] },
-      },
-    },
-    {
       $project: {
+        _id: 1,
         name: 1,
         description: 1,
         avatar: 1,
         admin: 1,
         members: 1,
-        interaction: 1,
+        interaction: {
+          $arrayElemAt: ["$conversation.interaction", 0],
+        },
       },
     },
   ]);
@@ -269,7 +281,7 @@ export const fetchGroups: AppRouteHandler<FetchGroupRoute> = async (ctx) => {
   return HttpResponse.success(ctx, HttpStatus.OK, "Groups fetched successfully!", groups);
 };
 
-export const fetchMembers = async (gid: Types.ObjectId) => {
-  const group = await Group.findById(gid).select("-_id members").lean();
-  return group?.members.map((id) => id.toString()) || [];
+export const fetchMembers = async (groupId: Types.ObjectId) => {
+  const group = await Group.findById(groupId).select("members -_id").lean();
+  return group?.members.map(String) ?? [];
 };

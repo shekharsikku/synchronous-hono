@@ -50,6 +50,13 @@ export const fetchContacts: AppRouteHandler<FetchContactsRoute> = async (ctx) =>
     { $match: { participants: userId } },
     { $sort: { interaction: -1 } },
     {
+      $project: {
+        _id: 0,
+        participants: 1,
+        interaction: 1,
+      },
+    },
+    {
       $lookup: {
         from: "users",
         let: { participants: "$participants" },
