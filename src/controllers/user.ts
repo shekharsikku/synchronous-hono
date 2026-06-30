@@ -52,11 +52,9 @@ export const profileSetup: AppRouteHandler<ProfileSetupRoute> = async (ctx) => {
   });
 
   if (!updatedProfile) {
-    const currentAuthKey = await getSignedCookie(ctx, env.SIGNED_SECRET, "current");
+    const currentToken = await getSignedCookie(ctx, env.SIGNED_SECRET, "current");
 
-    if (currentAuthKey) {
-      await revokeToken(ctx, currentAuthKey);
-    }
+    if (currentToken) await revokeToken(ctx, currentToken);
 
     return HttpResponse.error(ctx, HttpStatus.UNAUTHORIZED, "Please, sign in again!");
   }
@@ -87,11 +85,9 @@ export const updateImage: AppRouteHandler<UpdateImageRoute> = async (ctx) => {
   const requestUser = await User.findById(ctx.var.user._id);
 
   if (!requestUser) {
-    const currentAuthKey = await getSignedCookie(ctx, env.SIGNED_SECRET, "current");
+    const currentToken = await getSignedCookie(ctx, env.SIGNED_SECRET, "current");
 
-    if (currentAuthKey) {
-      await revokeToken(ctx, currentAuthKey);
-    }
+    if (currentToken) await revokeToken(ctx, currentToken);
 
     return HttpResponse.error(ctx, HttpStatus.UNAUTHORIZED, "Please, sign in again!");
   }
@@ -129,11 +125,9 @@ export const deleteImage: AppRouteHandler<DeleteImageRoute> = async (ctx) => {
   const requestUser = await User.findById(ctx.var.user._id);
 
   if (!requestUser) {
-    const currentAuthKey = await getSignedCookie(ctx, env.SIGNED_SECRET, "current");
+    const currentToken = await getSignedCookie(ctx, env.SIGNED_SECRET, "current");
 
-    if (currentAuthKey) {
-      await revokeToken(ctx, currentAuthKey);
-    }
+    if (currentToken) await revokeToken(ctx, currentToken);
 
     return HttpResponse.error(ctx, HttpStatus.UNAUTHORIZED, "Please, sign in again!");
   }
@@ -169,11 +163,9 @@ export const changePassword: AppRouteHandler<PasswordChangeRoute> = async (ctx) 
   const requestUser = await User.findById(ctx.var.user._id).select("+password");
 
   if (!requestUser) {
-    const currentAuthKey = await getSignedCookie(ctx, env.SIGNED_SECRET, "current");
+    const currentToken = await getSignedCookie(ctx, env.SIGNED_SECRET, "current");
 
-    if (currentAuthKey) {
-      await revokeToken(ctx, currentAuthKey);
-    }
+    if (currentToken) await revokeToken(ctx, currentToken);
 
     return HttpResponse.error(ctx, HttpStatus.UNAUTHORIZED, "Please, sign in again!");
   }

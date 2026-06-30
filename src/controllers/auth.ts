@@ -1,3 +1,4 @@
+/** biome-ignore-all lint/style/noNonNullAssertion: <issue and expiry timestamp available> */
 import { hash, verify } from "argon2";
 import type { Context } from "hono";
 import { deleteCookie, getSignedCookie } from "hono/cookie";
@@ -18,11 +19,11 @@ import {
 } from "#/utilities/helpers.js";
 import { HttpError, HttpResponse, HttpStatus } from "#/utilities/http/index.js";
 
-const parseAuthKey = (token: string) => {
+const parseToken = (token: string) => {
   const { uid, aid } = decryptAuth(token);
 
   if (!Types.ObjectId.isValid(uid) || !Types.ObjectId.isValid(aid)) {
-    throw new Error("Invalid authentication key!");
+    throw new Error("Invalid authentication token!");
   }
 
   return { userId: new Types.ObjectId(uid), authId: new Types.ObjectId(aid) };
@@ -30,7 +31,7 @@ const parseAuthKey = (token: string) => {
 
 export const revokeToken = async <C extends Context>(ctx: C, token: string) => {
   try {
-    const { userId, authId } = parseAuthKey(token);
+    const { userId, authId } = parseToken(token);
 
     await User.updateOne(
       {
@@ -73,21 +74,14 @@ export const signUpUser: AppRouteHandler<SignUpRoute> = async (ctx) => {
 };
 
 export const signInUser: AppRouteHandler<SignInRoute> = async (ctx) => {
-  const deviceId = ctx.req.header("x-device-id") ?? "unknown-device";
   const { email, username, password } = ctx.req.valid("json");
-  const conditions = [];
+  const query = email ? { email } : username ? { username } : null;
 
-  if (email) {
-    conditions.push({ email });
-  } else if (username) {
-    conditions.push({ username });
-  } else {
-    return HttpResponse.error(ctx, HttpStatus.BAD_REQUEST, "Required email or username!");
+  if (!query) {
+    return HttpResponse.error(ctx, HttpStatus.BAD_REQUEST, "Email or Username required!");
   }
 
-  const existsUser = await User.findOne({
-    $or: conditions,
-  }).select("+password +authentication");
+  const existsUser = await User.findOne(query).select("+password +authentication");
 
   if (!existsUser || !(await verify(existsUser.password, password))) {
     return HttpResponse.error(ctx, HttpStatus.UNAUTHORIZED, "Invalid credentials!");
@@ -100,15 +94,13 @@ export const signInUser: AppRouteHandler<SignInRoute> = async (ctx) => {
     return HttpResponse.success(ctx, HttpStatus.OK, "Complete your profile!", userInfo);
   }
 
-  const authorizeId = new Types.ObjectId();
-  const refreshToken = await generateRefresh(ctx, userInfo._id, authorizeId, deviceId);
-  const hashedRefresh = generateHash(refreshToken);
-  const refreshExpiry = new Date(Date.now() + env.REFRESH_EXPIRY * 1000);
+  const authId = new Types.ObjectId();
+  const refreshToken = await generateRefresh(ctx, userInfo._id.toString(), authId.toString());
 
   existsUser.authentication?.push({
-    _id: authorizeId,
-    token: hashedRefresh,
-    expiry: refreshExpiry,
+    _id: authId,
+    token: generateHash(refreshToken),
+    expiry: new Date(Date.now() + env.REFRESH_EXPIRY * 1000),
   });
 
   await existsUser.save();
@@ -117,11 +109,9 @@ export const signInUser: AppRouteHandler<SignInRoute> = async (ctx) => {
 };
 
 export const signOutUser: AppRouteHandler<SignOutRoute> = async (ctx) => {
-  const currentAuthKey = await getSignedCookie(ctx, env.SIGNED_SECRET, "current");
+  const currentToken = await getSignedCookie(ctx, env.SIGNED_SECRET, "current");
 
-  if (currentAuthKey) {
-    await revokeToken(ctx, currentAuthKey);
-  }
+  if (currentToken) await revokeToken(ctx, currentToken);
 
   deleteCookie(ctx, "access", cookieOptions);
   deleteCookie(ctx, "refresh", cookieOptions);
@@ -131,53 +121,44 @@ export const signOutUser: AppRouteHandler<SignOutRoute> = async (ctx) => {
 };
 
 export const authRefresh: AppRouteHandler<RefreshRoute> = async (ctx) => {
-  const deviceId = ctx.req.header("x-device-id") ?? "unknown-device";
-  const refreshToken = await getSignedCookie(ctx, env.SIGNED_SECRET, "refresh");
-  const currentAuthKey = await getSignedCookie(ctx, env.SIGNED_SECRET, "current");
+  const [refreshToken, currentToken] = await Promise.all([
+    getSignedCookie(ctx, env.SIGNED_SECRET, "refresh"),
+    getSignedCookie(ctx, env.SIGNED_SECRET, "current"),
+  ]);
 
-  if (!refreshToken || !currentAuthKey) {
+  if (!refreshToken || !currentToken) {
     return HttpResponse.error(ctx, HttpStatus.UNAUTHORIZED, "Unauthorized request!");
   }
 
-  const verifiedData = await (async () => {
+  const { userId, authId, shouldRotate } = await (async () => {
     try {
-      const parsedPayload = parseAuthKey(currentAuthKey);
+      const { userId, authId } = parseToken(currentToken);
 
-      const [jwtResult, hashedToken] = await Promise.all([
-        jwtVerify<{ uid: string }>(refreshToken, refreshSecret, {
-          algorithms: ["HS512"],
-        }),
-        generateHash(refreshToken),
-      ]);
+      const jwtResult = await jwtVerify(refreshToken, refreshSecret, {
+        algorithms: ["HS512"],
+      });
 
-      if (
-        !Types.ObjectId.isValid(jwtResult.payload.uid) ||
-        !parsedPayload.userId.equals(new Types.ObjectId(jwtResult.payload.uid)) ||
-        jwtResult.payload.jti !== deviceId
-      ) {
+      if (!userId.equals(jwtResult.payload.sub) || !authId.equals(jwtResult.payload.jti)) {
         throw new Error("Refresh request mismatch!");
       }
 
-      return {
-        userId: parsedPayload.userId,
-        authorizeId: parsedPayload.authId,
-        hashedRefresh: hashedToken,
-        refreshExpiry: jwtResult.payload.exp,
-      };
+      const issuedAt = jwtResult.payload.iat!;
+      const expiresAt = jwtResult.payload.exp!;
+      const currentTs = Math.floor(Date.now() / 1000);
+
+      const shouldRotate = currentTs >= issuedAt + (expiresAt - issuedAt) / 2;
+
+      return { userId, authId, shouldRotate };
     } catch {
-      await revokeToken(ctx, currentAuthKey);
+      await revokeToken(ctx, currentToken);
       throw new HttpError(HttpStatus.UNAUTHORIZED, "Please, sign in again!");
     }
   })();
 
-  const { userId, authorizeId, hashedRefresh, refreshExpiry } = verifiedData;
-  const currentTime = Math.floor(Date.now() / 1000);
-  const expiresAt = refreshExpiry ?? currentTime;
-
   const authFilter = {
     _id: userId,
     authentication: {
-      $elemMatch: { _id: authorizeId, token: hashedRefresh, expiry: { $gt: new Date() } },
+      $elemMatch: { _id: authId, token: generateHash(refreshToken), expiry: { $gt: new Date() } },
     },
   };
 
@@ -188,22 +169,19 @@ export const authRefresh: AppRouteHandler<RefreshRoute> = async (ctx) => {
   }
 
   const userInfo = createUserInfo(requestUser);
-  const shouldRotate = currentTime >= expiresAt - env.REFRESH_EXPIRY / 2;
 
   if (shouldRotate) {
-    const newRefreshToken = await generateRefresh(ctx, userId, authorizeId, deviceId);
-    const newHashedRefresh = generateHash(newRefreshToken);
-    const newRefreshExpiry = new Date(Date.now() + env.REFRESH_EXPIRY * 1000);
+    const refreshedToken = await generateRefresh(ctx, userId.toString(), authId.toString());
 
     const updatedResult = await User.updateOne(authFilter, {
       $set: {
-        "authentication.$.token": newHashedRefresh,
-        "authentication.$.expiry": newRefreshExpiry,
+        "authentication.$.token": generateHash(refreshedToken),
+        "authentication.$.expiry": new Date(Date.now() + env.REFRESH_EXPIRY * 1000),
       },
     });
 
     if (updatedResult.modifiedCount === 0) {
-      await revokeToken(ctx, currentAuthKey);
+      await revokeToken(ctx, currentToken);
       return HttpResponse.error(ctx, HttpStatus.UNAUTHORIZED, "Please, sign in again!");
     }
   }
