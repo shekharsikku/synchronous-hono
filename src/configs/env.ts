@@ -14,7 +14,7 @@ const env = cleanEnv(process.env, {
   REFRESH_SECRET: str(),
   REFRESH_EXPIRY: num(),
   SIGNED_SECRET: str(),
-  SOCKET_PUBLIC: str(),
+  SIGNED_SALT: str(),
   MONGODB_URI: url(),
 
   BODY_LIMIT: num(),

@@ -1,7 +1,7 @@
 import { Server as Engine } from "@socket.io/bun-engine";
 import { Server } from "socket.io";
-import env from "#/configs/env.js";
 import { logger } from "#/middlewares/index.js";
+import { verifyKeyPair } from "#/utilities/crypto.js";
 
 export const engine = new Engine();
 
@@ -12,13 +12,10 @@ io.bind(engine);
 const socketMap = new Map<string, Set<string>>();
 
 const getClients = () =>
-  Array.from(socketMap.entries()).reduce(
-    (acc, [uid, sockets]) => {
-      acc[uid] = Array.from(sockets);
-      return acc;
-    },
-    {} as Record<string, string[]>,
-  );
+  Array.from(socketMap.entries()).reduce<Record<string, string[]>>((acc, [uid, sockets]) => {
+    acc[uid] = Array.from(sockets);
+    return acc;
+  }, {});
 
 const hasSocket = (uid: string, sid: string) => {
   return socketMap.get(uid)?.has(sid) ?? false;
@@ -35,18 +32,24 @@ export const emitEvent = (sockets: string[], event: string, payload: any) => {
 };
 
 io.use((socket, next) => {
-  const publicKey = socket.handshake.auth["pk"] as string;
+  const { address: ip, auth, query } = socket.handshake;
+  const uid = query["uid"] as string;
 
-  if (publicKey !== env.SOCKET_PUBLIC) {
-    logger.info("Unauthorized socket attempt: %s", socket.handshake.address);
-    return next(new Error("Unauthorized socket connection!"));
+  try {
+    if (!verifyKeyPair(auth["pk"])) {
+      throw new Error("Invalid socket public key!");
+    }
+
+    socket.data.uid = uid;
+    return next();
+  } catch (err) {
+    logger.error({ err, ip, uid }, "Socket authentication failed!");
+    return next(new Error("Unauthorized socket!"));
   }
-
-  next();
 });
 
 io.on("connection", (socket) => {
-  const userId = socket.handshake.query["uid"] as string;
+  const userId = socket.data.uid as string;
 
   if (userId) {
     if (!socketMap.has(userId)) {
