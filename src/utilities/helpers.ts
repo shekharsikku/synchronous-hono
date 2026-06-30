@@ -5,7 +5,6 @@ import type { Context } from "hono";
 import { setSignedCookie } from "hono/cookie";
 import type { CookieOptions } from "hono/utils/cookie";
 import { CompactEncrypt, SignJWT } from "jose";
-import type { Types } from "mongoose";
 import env from "#/configs/env.js";
 import type { UserDocument } from "#/models/index.js";
 import { accessSecret, encryptAuth, refreshSecret } from "./crypto.js";
@@ -32,20 +31,16 @@ export const generateAccess = async (ctx: Context, user: UserInfo) => {
   return accessToken;
 };
 
-export const generateRefresh = async (
-  ctx: Context,
-  uid: Types.ObjectId,
-  aid: Types.ObjectId,
-  jti: string,
-) => {
+export const generateRefresh = async (ctx: Context, uid: string, aid: string) => {
   const refreshExpiry = env.REFRESH_EXPIRY;
-  const currentAuthKey = encryptAuth(uid.toString(), aid.toString());
+  const currentToken = encryptAuth(uid, aid);
 
-  const refreshToken = await new SignJWT({ uid: uid.toString() })
+  const refreshToken = await new SignJWT({})
     .setProtectedHeader({ alg: "HS512" })
+    .setSubject(uid)
+    .setJti(aid)
     .setIssuedAt()
     .setExpirationTime(`${refreshExpiry}sec`)
-    .setJti(jti)
     .sign(refreshSecret);
 
   await setSignedCookie(ctx, "refresh", refreshToken, env.SIGNED_SECRET, {
@@ -53,7 +48,7 @@ export const generateRefresh = async (
     ...cookieOptions,
   });
 
-  await setSignedCookie(ctx, "current", currentAuthKey, env.SIGNED_SECRET, {
+  await setSignedCookie(ctx, "current", currentToken, env.SIGNED_SECRET, {
     maxAge: refreshExpiry * 2,
     ...cookieOptions,
   });
