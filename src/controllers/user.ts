@@ -1,4 +1,3 @@
-import { hash, verify } from "argon2";
 import { getSignedCookie } from "hono/cookie";
 import env from "#/configs/env.js";
 import { imagekitDelete, imagekitUpload } from "#/configs/imagekit.js";
@@ -14,7 +13,6 @@ import type {
 import { emitEvent, getSockets } from "#/server.js";
 import { eventsService } from "#/services/events.js";
 import {
-  argonOptions,
   createUserInfo,
   generateAccess,
   hasEmptyField,
@@ -170,11 +168,11 @@ export const changePassword: AppRouteHandler<PasswordChangeRoute> = async (ctx) 
     return HttpResponse.error(ctx, HttpStatus.UNAUTHORIZED, "Please, sign in again!");
   }
 
-  if (!(await verify(requestUser.password, old_password))) {
+  if (!(await Bun.password.verify(old_password, requestUser.password))) {
     return HttpResponse.error(ctx, HttpStatus.FORBIDDEN, "Incorrect old password!");
   }
 
-  requestUser.password = await hash(new_password, argonOptions);
+  requestUser.password = await Bun.password.hash(new_password);
   await requestUser.save({ validateBeforeSave: true });
 
   const userInfo = createUserInfo(requestUser);

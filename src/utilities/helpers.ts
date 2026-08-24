@@ -1,6 +1,4 @@
-import { randomBytes } from "node:crypto";
 import { deflateSync } from "node:zlib";
-import type { Options } from "argon2";
 import type { Context } from "hono";
 import { setSignedCookie } from "hono/cookie";
 import type { CookieOptions } from "hono/utils/cookie";
@@ -87,12 +85,3 @@ export const createUserInfo = (user: UserDocument) => {
 };
 
 export type UserInfo = ReturnType<typeof createUserInfo>;
-
-export const argonOptions: Options = {
-  hashLength: 48,
-  timeCost: 4,
-  memoryCost: 2 ** 16,
-  parallelism: 2,
-  type: 2,
-  salt: randomBytes(32),
-};

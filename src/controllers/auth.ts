@@ -1,5 +1,4 @@
 /** biome-ignore-all lint/style/noNonNullAssertion: <issue and expiry timestamp available> */
-import { hash, verify } from "argon2";
 import type { Context } from "hono";
 import { deleteCookie, getSignedCookie } from "hono/cookie";
 import { jwtVerify } from "jose";
@@ -10,7 +9,6 @@ import type { AppRouteHandler } from "#/openapi/index.js";
 import type { RefreshRoute, SignInRoute, SignOutRoute, SignUpRoute } from "#/routes/auth.js";
 import { decryptAuth, generateHash, refreshSecret } from "#/utilities/crypto.js";
 import {
-  argonOptions,
   cookieOptions,
   createUserInfo,
   generateAccess,
@@ -63,7 +61,7 @@ export const signUpUser: AppRouteHandler<SignUpRoute> = async (ctx) => {
     return HttpResponse.error(ctx, HttpStatus.CONFLICT, "Email already exists!");
   }
 
-  const hashed = await hash(password, argonOptions);
+  const hashed = await Bun.password.hash(password);
 
   const newUser = await User.create({ email, password: hashed });
   const userInfo = createUserInfo(newUser);
@@ -82,7 +80,7 @@ export const signInUser: AppRouteHandler<SignInRoute> = async (ctx) => {
 
   const existsUser = await User.findOne(query).select("+password +authentication");
 
-  if (!existsUser || !(await verify(existsUser.password, password))) {
+  if (!existsUser || !(await Bun.password.verify(password, existsUser.password))) {
     return HttpResponse.error(ctx, HttpStatus.UNAUTHORIZED, "Invalid credentials!");
   }
 
