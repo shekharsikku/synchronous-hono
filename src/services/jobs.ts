@@ -1,5 +1,4 @@
-import { CronJob } from "cron";
-import { logger } from "#/middlewares/index.js";
+import logger from "#/configs/logger.js";
 import { Message, User } from "#/models/index.js";
 
 const calculatePastDate = (daysAgo: number) => {
@@ -8,8 +7,8 @@ const calculatePastDate = (daysAgo: number) => {
   return taskDate;
 };
 
-const jobs = new CronJob(
-  "0 0 0 * * *",
+const jobs = Bun.cron(
+  "@midnight",
   async () => {
     try {
       const currentDate = new Date();
@@ -30,9 +29,7 @@ const jobs = new CronJob(
       logger.error({ err }, "Cron job failed!");
     }
   },
-  null,
-  false,
-  "Asia/Kolkata",
+  { tz: "Asia/Kolkata" },
 );
 
 export default jobs;
