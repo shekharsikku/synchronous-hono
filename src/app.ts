@@ -16,7 +16,7 @@ webpush.setVapidDetails(env.VAPID_MAILTO, env.VAPID_PUBLIC_KEY, env.VAPID_PRIVAT
 const app = createRouter();
 
 app.use("/favicon.ico", serveStatic({ path: "./favicon.ico", precompressed: true }));
-app.use(requestId());
+app.use(requestId({ generator: () => Bun.randomUUIDv7() }));
 app.use(pinoLogger({ pino: logger }));
 
 app.use(
