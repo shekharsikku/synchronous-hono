@@ -5,7 +5,6 @@ import { deleteCookie, getSignedCookie } from "hono/cookie";
 import { jwtVerify } from "jose";
 import { Types } from "mongoose";
 import env from "#/configs/env.js";
-import { logger } from "#/middlewares/index.js";
 import { User } from "#/models/index.js";
 import type { AppRouteHandler } from "#/openapi/index.js";
 import type { RefreshRoute, SignInRoute, SignOutRoute, SignUpRoute } from "#/routes/auth.js";
@@ -47,7 +46,7 @@ export const revokeToken = async <C extends Context>(ctx: C, token: string) => {
       },
     );
   } catch (err) {
-    logger.error({ err }, "Unknown error occurred!");
+    ctx.var.logger.error({ err }, "Unknown error occurred!");
   } finally {
     deleteCookie(ctx, "access", cookieOptions);
     deleteCookie(ctx, "refresh", cookieOptions);

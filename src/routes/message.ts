@@ -1,4 +1,5 @@
 import { createRoute, z } from "@hono/zod-openapi";
+import limiter from "#/configs/limiter.js";
 import {
   deleteMessage,
   deleteMessages,
@@ -8,7 +9,7 @@ import {
   reactMessage,
   sendMessage,
 } from "#/controllers/message.js";
-import { authAccess, limiter } from "#/middlewares/index.js";
+import { authAccess } from "#/middlewares/index.js";
 import {
   createRouter,
   errorSchema,

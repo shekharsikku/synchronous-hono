@@ -2,7 +2,7 @@ import type { Context } from "hono";
 import { connect } from "mongoose";
 import app from "#/app.js";
 import env from "#/configs/env.js";
-import { logger } from "#/middlewares/index.js";
+import logger from "#/configs/logger.js";
 import { engine } from "#/server.js";
 import jobs from "#/services/jobs.js";
 
@@ -20,7 +20,7 @@ void (async () => {
 
     logger.info("Database connection success!");
 
-    jobs.start();
+    logger.info("Schedule start for: %s", jobs.cron);
 
     const server = Bun.serve({
       ...engine.handler(),

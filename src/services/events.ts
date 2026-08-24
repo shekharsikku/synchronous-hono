@@ -1,6 +1,6 @@
 import { createRoute, z } from "@hono/zod-openapi";
 import type { Context } from "hono";
-import { logger } from "#/middlewares/index.js";
+import logger from "#/configs/logger.js";
 import { HttpPhrases, HttpStatus } from "#/utilities/http/index.js";
 
 type EventsClient = {

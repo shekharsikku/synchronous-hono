@@ -1,4 +1,5 @@
 import { createRoute } from "@hono/zod-openapi";
+import limiter from "#/configs/limiter.js";
 import {
   changePassword,
   deleteImage,
@@ -6,7 +7,7 @@ import {
   updateImage,
   userInformation,
 } from "#/controllers/user.js";
-import { authAccess, limiter } from "#/middlewares/index.js";
+import { authAccess } from "#/middlewares/index.js";
 import {
   createRouter,
   errorSchema,

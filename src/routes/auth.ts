@@ -1,6 +1,6 @@
 import { createRoute } from "@hono/zod-openapi";
+import limiter from "#/configs/limiter.js";
 import { authRefresh, signInUser, signOutUser, signUpUser } from "#/controllers/auth.js";
-import { limiter } from "#/middlewares/index.js";
 import {
   createRouter,
   errorSchema,

@@ -1,5 +1,6 @@
 import { createRoute, z } from "@hono/zod-openapi";
-import { authEvents, limiter } from "#/middlewares/index.js";
+import limiter from "#/configs/limiter.js";
+import { authEvents } from "#/middlewares/index.js";
 import { type AppRouteHandler, createRouter, jsonContent, successSchema } from "#/openapi/index.js";
 import { connectEvents, eventsRoute } from "#/services/events.js";
 import { HttpPhrases, HttpResponse, HttpStatus } from "#/utilities/http/index.js";

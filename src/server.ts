@@ -1,6 +1,6 @@
 import { Server as Engine } from "@socket.io/bun-engine";
 import { Server } from "socket.io";
-import { logger } from "#/middlewares/index.js";
+import logger from "#/configs/logger.js";
 import { verifyKeyPair } from "#/utilities/crypto.js";
 
 export const engine = new Engine();

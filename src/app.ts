@@ -6,7 +6,7 @@ import { pinoLogger } from "hono-pino";
 import webpush from "web-push";
 import { ZodError } from "zod";
 import env from "#/configs/env.js";
-import { logger } from "#/middlewares/index.js";
+import logger from "#/configs/logger.js";
 import { configOpenAPI, createRouter } from "#/openapi/index.js";
 import routes from "#/routes/index.js";
 import { HttpError, HttpResponse, HttpStatus } from "#/utilities/http/index.js";
