@@ -1,5 +1,4 @@
 import { cleanEnv, num, port, str, url } from "envalid";
-import "dotenv/config";
 
 const env = cleanEnv(process.env, {
   IMAGEKIT_PUBLIC_KEY: str(),

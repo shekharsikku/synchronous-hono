@@ -1,6 +1,6 @@
 import ImageKit from "imagekit";
-import { logger } from "#/middlewares/index.js";
 import env from "./env.js";
+import logger from "./logger.js";
 
 const imagekit = new ImageKit({
   publicKey: env.IMAGEKIT_PUBLIC_KEY,
