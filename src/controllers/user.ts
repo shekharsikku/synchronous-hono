@@ -101,12 +101,7 @@ export const updateImage: AppRouteHandler<UpdateImageRoute> = async (ctx) => {
   }
 
   if (requestUser.image) {
-    const imageUrl = new URL(requestUser.image);
-    const fileId = imageUrl.searchParams.get("fid");
-
-    if (fileId) {
-      imagekitDelete(fileId).catch(() => {});
-    }
+    imagekitDelete(requestUser.image);
   }
 
   requestUser.image = `${uploadedImage.url}?fid=${uploadedImage.fileId}`;
@@ -134,12 +129,7 @@ export const deleteImage: AppRouteHandler<DeleteImageRoute> = async (ctx) => {
     return HttpResponse.error(ctx, HttpStatus.NOT_FOUND, "Image not available!");
   }
 
-  const imageUrl = new URL(requestUser.image);
-  const fileId = imageUrl.searchParams.get("fid");
-
-  if (fileId) {
-    imagekitDelete(fileId).catch(() => {});
-  }
+  imagekitDelete(requestUser.image);
 
   requestUser.image = null;
   await requestUser.save({ validateBeforeSave: false });

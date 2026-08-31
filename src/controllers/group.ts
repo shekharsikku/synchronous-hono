@@ -193,12 +193,7 @@ export const updateAvatar: AppRouteHandler<UpdateAvatarRoute> = async (ctx) => {
   }
 
   if (currentGroup.avatar) {
-    const imageUrl = new URL(currentGroup.avatar);
-    const fileId = imageUrl.searchParams.get("fid");
-
-    if (fileId) {
-      imagekitDelete(fileId).catch(() => {});
-    }
+    imagekitDelete(currentGroup.avatar);
   }
 
   currentGroup.avatar = `${uploadedImage.url}?fid=${uploadedImage.fileId}`;
@@ -222,12 +217,7 @@ export const deleteAvatar: AppRouteHandler<DeleteAvatarRoute> = async (ctx) => {
     return HttpResponse.error(ctx, HttpStatus.BAD_REQUEST, "Group avatar not available!");
   }
 
-  const imageUrl = new URL(currentGroup.avatar);
-  const fileId = imageUrl.searchParams.get("fid");
-
-  if (fileId) {
-    imagekitDelete(fileId).catch(() => {});
-  }
+  imagekitDelete(currentGroup.avatar);
 
   currentGroup.avatar = null;
   await currentGroup.save({ validateBeforeSave: false });
